@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+:root {
+  /* ── Pantry App Design Tokens ── */
+  --background:       oklch(97% 0.006 85);
+  --foreground:       oklch(24% 0.02 85);
+  --muted:            oklch(50% 0.02 85);
+  --muted-light:      oklch(52% 0.02 85);
+  --divider:          oklch(94% 0.007 85);
+  --surface:          oklch(89% 0.014 85);
+
+  /* Accent palette */
+  --yellow:           #FFD333;
+  --yellow-light:     #FFE680;
+  --teal:             #23967F;
+  --red:              #EE1B49;
+  --red-dark:         #C81440;
+  --orange:           #FFA070;
+  --orange-dark:      #B85A2E;
+  --amber:            #A86F00;
+
+  /* Avatar colors */
+  --avatar-1-bg:      #FFD333;
+  --avatar-1-text:    #4A3300;
+  --avatar-2-bg:      #23967F;
+  --avatar-2-text:    #ffffff;
+
+  /* Glass layers */
+  --glass-header:     oklch(99% 0.003 85 / 0.55);
+  --glass-card:       oklch(100% 0 0 / 0.35);
+  --glass-nav:        oklch(100% 0 0 / 0.35);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-figtree), system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-figtree), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
