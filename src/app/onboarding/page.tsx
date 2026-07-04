@@ -46,22 +46,22 @@ export default function OnboardingPage() {
       .single()
 
     if (householdError || !household) {
-      setError('Something went wrong. Please try again.')
+      setError(`Household error: ${householdError?.message ?? 'unknown'}`)
       setLoading(false)
       return
     }
 
-    // Update the profile
+    // Upsert the profile (handles both new and existing rows)
     const { error: profileError } = await supabase
       .from('profiles')
-      .update({
+      .upsert({
+        id: user.id,
         display_name: displayName.trim(),
         household_id: household.id,
       })
-      .eq('id', user.id)
 
     if (profileError) {
-      setError('Something went wrong. Please try again.')
+      setError(`Profile error: ${profileError.message}`)
       setLoading(false)
       return
     }
