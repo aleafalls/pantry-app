@@ -34,19 +34,21 @@ export default function OnboardingPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/auth'); return }
 
-    // Create the household
-    const { data: household, error: householdError } = await supabase
+    // Generate the household ID client-side so we don't need to SELECT after INSERT
+    // (SELECT would fail — the user isn't a member yet when the row is first created)
+    const householdId = crypto.randomUUID()
+
+    const { error: householdError } = await supabase
       .from('households')
       .insert({
+        id: householdId,
         name: householdName.trim(),
         invite_code: generateInviteCode(),
         default_low_threshold: 2,
       })
-      .select()
-      .single()
 
-    if (householdError || !household) {
-      setError(`Household error: ${householdError?.message ?? 'unknown'}`)
+    if (householdError) {
+      setError(`Household error: ${householdError.message}`)
       setLoading(false)
       return
     }
@@ -57,7 +59,7 @@ export default function OnboardingPage() {
       .upsert({
         id: user.id,
         display_name: displayName.trim(),
-        household_id: household.id,
+        household_id: householdId,
       })
 
     if (profileError) {
