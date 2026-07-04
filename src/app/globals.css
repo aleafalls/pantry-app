@@ -37,10 +37,22 @@
   --font-sans: var(--font-figtree), system-ui, sans-serif;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  /* Ensure Tailwind utility padding/margin works on interactive elements.
+     Browser UA stylesheets are unlayered and can override layered utilities. */
+  button, [type='button'], [type='reset'], [type='submit'] {
+    padding: 0;
+    margin: 0;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: inherit;
+  }
 }
 
 body {
@@ -50,3 +62,40 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Hide scrollbars on horizontal scroll containers */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * Custom scale values not in Tailwind's default scale.
+ * Defined here (not as arbitrary values) because Tailwind v4 + Next.js
+ * does not reliably scan and generate arbitrary bracket classes at build time.
+ */
+.text-105  { font-size: 10.5px; }
+.text-11   { font-size: 11px; }
+.text-115  { font-size: 11.5px; }
+.text-13   { font-size: 13px; }
+.text-135  { font-size: 13.5px; }
+.text-17   { font-size: 17px; }
+
+.rounded-11  { border-radius: 11px; }
+.rounded-14  { border-radius: 14px; }
+.rounded-28  { border-radius: 28px; }
+
+.pt-14px     { padding-top: 14px; }
+.py-7px      { padding-block: 7px; }
+.px-14px     { padding-inline: 14px; }
+
+.w-26px      { width: 26px; }
+.min-w-18px  { min-width: 18px; }
+.h-18px      { height: 18px; }
+.min-w-108px { min-width: 108px; }
+
+.tracking-003  { letter-spacing: 0.03em; }
+.gap-9px       { gap: 9px; }

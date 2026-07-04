@@ -38,7 +38,7 @@ export default function RootLayout({
         <link rel="stylesheet" href="/fonts/uicons/uicons-solid-rounded.css" />
       </head>
       <body>
-        <div className="mx-auto max-w-[390px] min-h-screen relative overflow-hidden">
+        <div style={{ maxWidth: 660, margin: '0 auto', minHeight: '100vh', position: 'relative' }}>
           {children}
         </div>
       </body>

@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
 
 export default function AuthPage() {
   const [email, setEmail] = useState('')
@@ -17,33 +20,21 @@ export default function AuthPage() {
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     })
 
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-      return
-    }
-
+    if (error) { setError(error.message); setLoading(false); return }
     setSent(true)
     setLoading(false)
   }
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center px-6"
-      style={{ background: 'var(--background)' }}
-    >
-      {/* Logo / wordmark */}
+    <div className="min-h-screen flex flex-col items-center justify-center px-6"
+      style={{ background: 'var(--background)' }}>
+
       <div className="mb-10 text-center">
         <div className="text-4xl mb-3">🥫</div>
-        <h1
-          className="text-2xl font-extrabold tracking-tight"
-          style={{ color: 'var(--foreground)' }}
-        >
+        <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: 'var(--foreground)' }}>
           Pantry
         </h1>
         <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
@@ -52,11 +43,8 @@ export default function AuthPage() {
       </div>
 
       {sent ? (
-        /* ── Confirmation state ── */
-        <div
-          className="w-full max-w-sm rounded-2xl p-6 text-center"
-          style={{ background: 'var(--glass-card)', backdropFilter: 'blur(14px)' }}
-        >
+        <div className="w-full max-w-sm rounded-2xl p-6 text-center"
+          style={{ background: 'var(--glass-card)', backdropFilter: 'blur(14px)' }}>
           <div className="text-3xl mb-3">📬</div>
           <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--foreground)' }}>
             Check your email
@@ -66,28 +54,19 @@ export default function AuthPage() {
           </p>
           <p className="text-xs mt-4" style={{ color: 'var(--muted-light)' }}>
             Didn&apos;t get it? Check your spam folder or{' '}
-            <button
-              onClick={() => setSent(false)}
-              className="underline"
-              style={{ color: 'var(--amber)' }}
-            >
+            <button onClick={() => setSent(false)} className="underline"
+              style={{ color: 'var(--amber)' }}>
               try again
-            </button>
-            .
+            </button>.
           </p>
         </div>
       ) : (
-        /* ── Email form ── */
         <form onSubmit={handleSubmit} className="w-full max-w-sm flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <label
-              htmlFor="email"
-              className="text-sm font-600"
-              style={{ color: 'var(--foreground)' }}
-            >
+            <Label htmlFor="email" style={{ color: 'var(--foreground)' }}>
               Enter your email to get started
-            </label>
-            <input
+            </Label>
+            <Input
               id="email"
               type="email"
               required
@@ -95,7 +74,7 @@ export default function AuthPage() {
               placeholder="you@example.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full rounded-xl px-4 py-3 text-sm outline-none border"
+              className="rounded-xl py-3 text-sm"
               style={{
                 background: 'oklch(100% 0 0 / 0.6)',
                 borderColor: 'oklch(100% 0 0 / 0.5)',
@@ -104,23 +83,20 @@ export default function AuthPage() {
             />
           </div>
 
-          {error && (
-            <p className="text-sm" style={{ color: 'var(--red)' }}>
-              {error}
-            </p>
-          )}
+          {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
 
-          <button
+          <Button
             type="submit"
+            variant="brand"
             disabled={loading || !email}
-            className="w-full py-3 rounded-xl text-sm font-bold transition-opacity disabled:opacity-50"
             style={{
               background: 'linear-gradient(150deg, var(--yellow-light), var(--yellow))',
               color: '#4A3300',
+              padding: '12px 16px',
             }}
           >
             {loading ? 'Sending…' : 'Send magic link'}
-          </button>
+          </Button>
         </form>
       )}
     </div>
