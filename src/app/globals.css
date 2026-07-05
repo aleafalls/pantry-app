@@ -29,6 +29,25 @@
   --glass-header:     oklch(99% 0.003 85 / 0.55);
   --glass-card:       oklch(100% 0 0 / 0.35);
   --glass-nav:        oklch(100% 0 0 / 0.35);
+
+  /* shadcn/ui component tokens */
+  --popover:            oklch(100% 0 0);
+  --popover-foreground: oklch(24% 0.02 85);
+  --border:             oklch(94% 0.007 85);
+  --input:              oklch(94% 0.007 85);
+  --ring:               #FFD333;
+  --primary:            #FFD333;
+  --primary-foreground: #4A3300;
+  --secondary:          oklch(89% 0.014 85);
+  --secondary-foreground: oklch(24% 0.02 85);
+  --accent:             oklch(89% 0.014 85);
+  --accent-foreground:  oklch(24% 0.02 85);
+  --muted-foreground:   oklch(50% 0.02 85);
+  --card:               oklch(100% 0 0);
+  --card-foreground:    oklch(24% 0.02 85);
+  --destructive:        #EE1B49;
+  --destructive-foreground: #ffffff;
+  --radius:             0.75rem;
 }
 
 @theme inline {

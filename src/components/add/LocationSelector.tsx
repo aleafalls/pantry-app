@@ -33,7 +33,7 @@ export default function LocationSelector({ value, onChange }: Props) {
                 transition: 'all 0.15s',
               }}
             >
-              {loc.label}
+              {loc.emoji} {loc.label}
             </button>
           )
         })}

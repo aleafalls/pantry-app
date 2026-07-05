@@ -21,8 +21,8 @@ export const UNITS_GROUPED: Record<string, string[]> = {
 }
 
 export const LOCATIONS = [
-  { value: 'pantry',     label: 'Pantry'     },
-  { value: 'fridge',     label: 'Fridge'     },
-  { value: 'freezer',    label: 'Freezer'    },
-  { value: 'spice_rack', label: 'Spice Rack' },
+  { value: 'pantry',     label: 'Pantry',     emoji: '🥫' },
+  { value: 'fridge',     label: 'Fridge',     emoji: '🧊' },
+  { value: 'freezer',    label: 'Freezer',    emoji: '❄️' },
+  { value: 'spice_rack', label: 'Spice Rack', emoji: '🧂' },
 ]

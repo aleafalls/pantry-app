@@ -3,10 +3,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { copyCatalogItemToHousehold } from '@/lib/catalog'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
+import PageHeader from '@/components/layout/PageHeader'
 
 interface HouseholdItem {
   id: string
@@ -32,7 +32,6 @@ export default function AddPage() {
   const [householdItems, setHouseholdItems] = useState<HouseholdItem[]>([])
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([])
   const [loading, setLoading] = useState(false)
-  const [copying, setCopying] = useState<string | null>(null)
   const [householdId, setHouseholdId] = useState<string | null>(null)
 
   // Load household id on mount + auto-focus
@@ -81,15 +80,8 @@ export default function AddPage() {
     return () => clearTimeout(timer)
   }, [query, householdId])
 
-  async function handleCatalogTap(item: CatalogItem) {
-    if (!householdId) return
-    setCopying(item.id)
-    try {
-      const newItemId = await copyCatalogItemToHousehold(item.id, householdId)
-      router.push(`/add/restock/${newItemId}`)
-    } catch {
-      setCopying(null)
-    }
+  function handleCatalogTap(item: CatalogItem) {
+    router.push(`/add/restock?catalogId=${item.id}`)
   }
 
   const hasResults = householdItems.length > 0 || catalogItems.length > 0
@@ -98,7 +90,7 @@ export default function AddPage() {
   return (
     <div style={{ minHeight: '100vh', paddingBottom: 112, background: 'var(--background)', position: 'relative' }}>
 
-      {/* Fixed search header */}
+      {/* Search header — custom layout to fit input alongside back arrow */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 10,
         padding: '16px 20px 12px',
@@ -108,9 +100,9 @@ export default function AddPage() {
         borderBottom: '1px solid oklch(100% 0 0 / 0.4)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Link href="/" style={{ color: 'var(--muted)', fontSize: 20, lineHeight: 1, textDecoration: 'none', flexShrink: 0 }}>
-            ←
-          </Link>
+          <a href="/" style={{ color: 'var(--muted)', textDecoration: 'none', flexShrink: 0, lineHeight: 1 }} aria-label="Go back">
+            <i className="fi-rr-angle-left" style={{ fontSize: 18, display: 'block' }} />
+          </a>
           <div style={{ flex: 1, position: 'relative' }}>
             <Input
               ref={inputRef}
@@ -205,14 +197,12 @@ export default function AddPage() {
               <button
                 key={item.id}
                 onClick={() => handleCatalogTap(item)}
-                disabled={copying === item.id}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   width: '100%', padding: '12px 20px',
-                  background: 'none', border: 'none', cursor: copying === item.id ? 'wait' : 'pointer',
+                  background: 'none', border: 'none', cursor: 'pointer',
                   borderBottom: '1px solid var(--divider)',
                   textAlign: 'left',
-                  opacity: copying === item.id ? 0.5 : 1,
                 }}
               >
                 <span style={{ fontSize: 22, lineHeight: 1, width: 28, flexShrink: 0 }}>

@@ -132,7 +132,7 @@ export default function OnboardingPage() {
 
           <button type="button" onClick={() => setStep('name')}
             className="text-sm text-center" style={{ color: 'var(--muted)' }}>
-            ← Back
+            <i className="fi-rr-angle-left" style={{ fontSize: 14, display: 'inline-block', verticalAlign: 'middle', marginRight: 4 }} /> Back
           </button>
 
           <div className="mt-4 p-4 rounded-xl text-sm text-center" style={{ background: 'var(--surface)' }}>

@@ -2,8 +2,8 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import PageHeader from '@/components/layout/PageHeader'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -99,19 +99,7 @@ function NewItemForm() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--background)', paddingBottom: 112 }}>
 
-      {/* Header */}
-      <div style={{
-        position: 'sticky', top: 0, zIndex: 10,
-        padding: '16px 20px',
-        display: 'flex', alignItems: 'center', gap: 12,
-        background: 'oklch(99% 0.003 85 / 0.85)',
-        backdropFilter: 'blur(20px) saturate(160%)',
-        WebkitBackdropFilter: 'blur(20px) saturate(160%)',
-        borderBottom: '1px solid oklch(100% 0 0 / 0.4)',
-      }}>
-        <Link href="/add" style={{ color: 'var(--muted)', fontSize: 20, textDecoration: 'none', flexShrink: 0 }}>←</Link>
-        <h1 className="text-base font-extrabold" style={{ color: 'var(--foreground)' }}>New item</h1>
-      </div>
+      <PageHeader title="New item" backHref="/add" />
 
       <form onSubmit={handleSubmit} style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
