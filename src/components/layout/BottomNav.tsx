@@ -45,7 +45,9 @@ export default function BottomNav() {
         }}
       >
         {tabs.map(tab => {
-          const isActive = pathname === tab.href
+          const isActive = tab.href === '/'
+            ? pathname === '/'
+            : pathname.startsWith(tab.href)
           const isAdd = tab.label === 'Add'
 
           if (isAdd) {
