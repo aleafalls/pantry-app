@@ -50,6 +50,37 @@ Before writing any UI, check if a shared component already exists. **Use shared 
 
 ---
 
+## Known Bugs & Patterns — Hard-Won Lessons
+
+### Never put `overflow: hidden` on containers with sticky or fixed children
+`overflow: hidden` / `overflow-x: hidden` on a parent creates a new scroll container, which breaks `position: sticky` on children and clips `position: absolute` elements (like decorative blobs). This was a major debugging issue. Use `overflow-x: clip` if horizontal clipping is needed — it doesn't create a scroll container.
+
+### shadcn semantic color classes don't generate in this project
+`bg-popover`, `bg-accent`, `text-popover-foreground`, `focus:bg-accent`, `bg-primary` etc. are Tailwind semantic color classes that require a full shadcn CSS variable theme setup. They are silently absent from the generated CSS in this project. When editing any shadcn component file (`src/components/ui/*.tsx`), replace these with `style={{}}` using our own CSS vars or hex values. The Select dropdown was transparent for this reason.
+
+### Never use Unicode symbols for navigation icons
+Never use `←`, `→`, `×`, `+` as navigation or icon elements. Always use UIicons: `fi-rr-angle-left` for back, `fi-rr-plus` for add, `fi-rr-cross-small` for close. Check `public/fonts/uicons/uicons-regular-rounded.css` for available names.
+
+### Never use responsive Tailwind prefixes (`sm:`, `md:`, `lg:`)
+This app has no responsive breakpoints. The max-width container is always 660px. `sm:px-8` etc. break the mobile-first layout by applying different padding on larger screens. Every element should look the same at any viewport within the 660px column.
+
+### `font-600` is not a valid Tailwind class
+Valid font weight classes: `font-normal` (400), `font-medium` (500), `font-semibold` (600), `font-bold` (700), `font-extrabold` (800).
+
+### CSS resets must be inside `@layer base`
+Any `* { margin: 0; padding: 0; }` placed OUTSIDE a CSS layer beats all Tailwind utility classes (which live in `@layer utilities`). This silently removed all padding and margin from every element. Always put global resets inside `@layer base {}` in `globals.css`.
+
+### RLS self-referencing policies cause infinite recursion
+If a Supabase RLS policy on table X queries table X to check membership (e.g., the `profiles` policy queried `profiles` to find the household), it causes infinite recursion. Fix: create a `SECURITY DEFINER` function that reads the table without triggering RLS, then reference the function in policies.
+
+### `.insert().select().single()` fails on first-time rows
+After inserting a row, immediately SELECT-ing it back fails if the user isn't yet a "member" per the RLS policy (e.g., inserting a household before the profile references it). Always use `crypto.randomUUID()` to generate the ID before inserting, then use that known ID directly — never read back what you just wrote.
+
+### Build plan phases must stay in order
+Phases build on each other. Skipping a phase (e.g., skipping Deploy before building Auth) causes confusion and missing setup steps. Follow `pantry-app-build-plan.md` sequentially.
+
+---
+
 ## Styling Rules
 
 ### Critical: Tailwind v4 does NOT scan arbitrary values
@@ -135,13 +166,28 @@ Catalog items are copied to household `items` only when the user **completes** t
 ---
 
 ## Icons
+Always use UIicons. Never use Unicode characters (`←`, `+`, `×`) as icon substitutes — the user will notice and correct it.
+
 ```tsx
-// Back arrow
+// Usage pattern
 <i className="fi-rr-angle-left" style={{ fontSize: 18, display: 'block' }} />
 
-// Common names: fi-rr-home, fi-rr-box, fi-rr-shopping-cart, fi-rr-settings,
-//               fi-rr-search, fi-rr-plus, fi-rr-barcode-scan, fi-rr-angle-left
+// Common names
+// fi-rr-angle-left    Back navigation
+// fi-rr-home          Home tab
+// fi-rr-box           Inventory tab
+// fi-rr-shopping-cart Shopping tab
+// fi-rr-settings      Settings tab
+// fi-rr-search        Search field
+// fi-rr-barcode-scan  Barcode scanner
+// fi-rr-plus          Add action
+// fi-rr-cross-small   Close / dismiss
+// fi-rr-check         Confirm / success
+// fi-rr-pencil        Edit
+// fi-rr-trash         Delete
 ```
+
+To find any icon: `grep "fi-rr-[keyword]" public/fonts/uicons/uicons-regular-rounded.css`
 
 ---
 
