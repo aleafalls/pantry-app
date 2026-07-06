@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import DrawerSelect from '@/components/ui/DrawerSelect'
 import QuantityStepper from '@/components/add/QuantityStepper'
 import TagInput from '@/components/add/TagInput'
-import { LOCATIONS } from '@/lib/constants'
+import { LOCATIONS, UNITS_GROUPED } from '@/lib/constants'
 
 interface InventoryRow {
   id: string
@@ -45,25 +45,50 @@ function formatDate(iso: string) {
 
 export default function ItemDetail({ item, inventoryRows, userId }: Props) {
   const router = useRouter()
+
   const [rows, setRows] = useState(inventoryRows)
-  const [editingRowId, setEditingRowId] = useState<string | null>(null)
-  const [editQty, setEditQty] = useState('')
+  const [qtyValues, setQtyValues] = useState<Record<string, number>>(
+    Object.fromEntries(inventoryRows.map(r => [r.id, r.quantity]))
+  )
+  const [locationValues, setLocationValues] = useState<Record<string, string>>(
+    Object.fromEntries(inventoryRows.map(r => [r.id, r.location]))
+  )
+  const [unitValues, setUnitValues] = useState<Record<string, string>>(
+    Object.fromEntries(inventoryRows.map(r => [r.id, r.unit]))
+  )
   const [lowThreshold, setLowThreshold] = useState(item.low_threshold)
   const [tags, setTags] = useState<string[]>(item.tags ?? [])
   const [manualLow, setManualLow] = useState(inventoryRows.some(r => r.manual_low_flag))
-  const [removing, setRemoving] = useState(false)
   const [confirmRemove, setConfirmRemove] = useState(false)
+  const [removing, setRemoving] = useState(false)
 
   const mostRecent = rows.reduce<InventoryRow | null>((a, b) =>
     !a || b.updated_at > a.updated_at ? b : a, null)
 
-  async function saveQty(rowId: string) {
-    const parsed = parseFloat(editQty)
-    if (isNaN(parsed) || parsed < 0) { setEditingRowId(null); return }
+  async function saveQty(rowId: string, val: number) {
+    setQtyValues(v => ({ ...v, [rowId]: val }))
     const supabase = createClient()
-    await supabase.from('inventory').update({ quantity: parsed, added_by: userId }).eq('id', rowId)
-    setRows(rows.map(r => r.id === rowId ? { ...r, quantity: parsed } : r))
-    setEditingRowId(null)
+    await supabase.from('inventory').update({ quantity: val, added_by: userId }).eq('id', rowId)
+    setRows(rows.map(r => r.id === rowId ? { ...r, quantity: val } : r))
+  }
+
+  async function changeLocation(rowId: string, newLoc: string) {
+    // Don't allow selecting a location already taken by another row for this item
+    const taken = rows.filter(r => r.id !== rowId).map(r => r.location)
+    if (taken.includes(newLoc)) return
+    setLocationValues(v => ({ ...v, [rowId]: newLoc }))
+    const supabase = createClient()
+    await supabase.from('inventory').update({ location: newLoc }).eq('id', rowId)
+    setRows(rows.map(r => r.id === rowId ? { ...r, location: newLoc } : r))
+  }
+
+  async function changeUnit(rowId: string, newUnit: string) {
+    setUnitValues(v => ({ ...v, [rowId]: newUnit }))
+    const supabase = createClient()
+    await supabase.from('inventory').update({ unit: newUnit }).eq('id', rowId)
+    setRows(rows.map(r => r.id === rowId ? { ...r, unit: newUnit } : r))
+    // Also update the item's default unit to stay in sync
+    await supabase.from('items').update({ default_unit: newUnit }).eq('id', item.id)
   }
 
   async function saveThreshold(val: number) {
@@ -100,6 +125,19 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
     </div>
   )
 
+  const detailRow = (left: React.ReactNode, right: React.ReactNode) => (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>{left}</div>
+      <div style={{ flexShrink: 0 }}>{right}</div>
+    </div>
+  )
+
+  const inputStyle = {
+    background: 'oklch(100% 0 0 / 0.6)',
+    borderColor: 'oklch(100% 0 0 / 0.5)',
+    color: 'var(--foreground)',
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--background)', paddingBottom: 112 }}>
       <PageHeader title={item.name} backHref="/inventory" />
@@ -121,84 +159,111 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
           </div>
         </div>
 
-        {/* Stock per location */}
+        {/* ── Stock per location ── */}
         {section('Stock')}
-        <div style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid var(--divider)', marginBottom: 20 }}>
-          {rows.length === 0 ? (
-            <div style={{ padding: '16px', textAlign: 'center' }}>
-              <p className="text-sm" style={{ color: 'var(--muted)' }}>No stock recorded yet.</p>
-            </div>
-          ) : rows.map((row, i) => {
-            const loc = locationInfo(row.location)
-            const isEditing = editingRowId === row.id
-            return (
-              <div key={row.id} style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '14px 16px',
-                borderBottom: i < rows.length - 1 ? '1px solid var(--divider)' : 'none',
-                background: 'oklch(100% 0 0 / 0.4)',
-              }}>
-                <span style={{ fontSize: 18 }}>{loc.emoji}</span>
-                <span className="text-sm font-semibold flex-1" style={{ color: 'var(--foreground)' }}>
-                  {loc.label}
-                </span>
-                {isEditing ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Input
-                      type="number"
-                      autoFocus
-                      value={editQty}
-                      onChange={e => setEditQty(e.target.value)}
-                      onBlur={() => saveQty(row.id)}
-                      onKeyDown={e => e.key === 'Enter' && saveQty(row.id)}
-                      className="rounded-lg text-sm text-right"
-                      style={{
-                        width: 72, padding: '6px 10px',
-                        background: 'oklch(100% 0 0 / 0.8)',
-                        borderColor: 'var(--yellow)',
-                        color: 'var(--foreground)',
-                      }}
-                    />
-                    <span className="text-sm" style={{ color: 'var(--muted)' }}>{row.unit}</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => { setEditingRowId(row.id); setEditQty(String(row.quantity)) }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 6,
-                      background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px',
-                      borderRadius: 8,
-                    }}
-                  >
-                    <span className="text-sm font-bold" style={{ color: 'var(--foreground)' }}>{row.quantity}</span>
-                    <span className="text-sm" style={{ color: 'var(--muted)' }}>{row.unit}</span>
-                    <i className="fi-rr-edit" style={{ fontSize: 12, color: 'var(--muted)', display: 'block' }} />
-                  </button>
-                )}
-              </div>
-            )
-          })}
-        </div>
 
-        {/* Details */}
+        {rows.length === 0 ? (
+          <p className="text-sm" style={{ color: 'var(--muted)', marginBottom: 20 }}>
+            No stock recorded yet.
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0, marginBottom: 20 }}>
+            {rows.map((row, i) => {
+              const takenLocations = rows.filter(r => r.id !== row.id).map(r => r.location)
+              const currentLoc = locationValues[row.id] ?? row.location
+              const currentUnit = unitValues[row.id] ?? row.unit
+              const currentQty = qtyValues[row.id] ?? row.quantity
+
+              return (
+                <div key={row.id}>
+                  {i > 0 && (
+                    <div style={{ height: 1, background: 'var(--divider)', margin: '16px 0' }} />
+                  )}
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                    {/* Location */}
+                    {detailRow(
+                      <p className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>Location</p>,
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        {LOCATIONS.map(loc => {
+                          const isCurrent = currentLoc === loc.value
+                          const isTaken = takenLocations.includes(loc.value)
+                          return (
+                            <button
+                              key={loc.value}
+                              type="button"
+                              onClick={() => changeLocation(row.id, loc.value)}
+                              disabled={isTaken}
+                              style={{
+                                padding: '6px 12px', borderRadius: 99, fontSize: 12,
+                                fontWeight: isCurrent ? 700 : 500,
+                                cursor: isTaken ? 'not-allowed' : 'pointer',
+                                opacity: isTaken ? 0.35 : 1,
+                                border: isCurrent ? '2px solid var(--yellow)' : '1px solid var(--divider)',
+                                background: isCurrent ? 'var(--yellow-light)' : 'var(--surface)',
+                                color: isCurrent ? '#4A3300' : 'var(--foreground)',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {loc.emoji} {loc.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {/* Quantity */}
+                    {detailRow(
+                      <p className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>Quantity</p>,
+                      <QuantityStepper value={currentQty} onChange={val => saveQty(row.id, val)} min={0} />
+                    )}
+
+                    {/* Unit */}
+                    {detailRow(
+                      <p className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>Unit</p>,
+                      <div style={{ width: 160 }}>
+                        <DrawerSelect
+                          title="Unit"
+                          value={currentUnit}
+                          onChange={val => changeUnit(row.id, val)}
+                          groups={Object.entries(UNITS_GROUPED).map(([label, units]) => ({
+                            label,
+                            options: units.map(u => ({ value: u, label: u })),
+                          }))}
+                          searchable
+                        />
+                      </div>
+                    )}
+
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* ── Details ── */}
         {section('Details')}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 20 }}>
 
-          {/* Low threshold */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <div>
+          {detailRow(
+            <>
               <p className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>Alert when below</p>
-              <p className="text-11" style={{ color: 'var(--muted)' }}>Currently {lowThreshold} {rows[0]?.unit ?? ''}</p>
-            </div>
+              <p className="text-11" style={{ color: 'var(--muted)' }}>
+                Currently {lowThreshold} {rows[0]?.unit ?? ''}
+              </p>
+            </>,
             <QuantityStepper value={lowThreshold} onChange={saveThreshold} min={0} />
-          </div>
+          )}
 
-          {/* Manual low flag */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <div>
+          {detailRow(
+            <>
               <p className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>Mark as running low</p>
-              <p className="text-11" style={{ color: 'var(--muted)' }}>Adds to shopping list regardless of quantity</p>
-            </div>
+              <p className="text-11" style={{ color: 'var(--muted)' }}>
+                Adds to shopping list regardless of quantity
+              </p>
+            </>,
             <button
               onClick={toggleManualLow}
               style={{
@@ -214,9 +279,8 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
                 boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
               }} />
             </button>
-          </div>
+          )}
 
-          {/* Tags */}
           <div>
             <p className="text-sm font-semibold" style={{ color: 'var(--foreground)', marginBottom: 8 }}>Tags</p>
             <TagInput tags={tags} onChange={saveTags} />
@@ -256,7 +320,8 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
             </button>
           ) : (
             <div style={{
-              padding: '16px', borderRadius: 14, background: 'color-mix(in oklch, #EE1B49 10%, white 90%)',
+              padding: '16px', borderRadius: 14,
+              background: 'color-mix(in oklch, #EE1B49 10%, white 90%)',
               border: '1px solid color-mix(in oklch, #EE1B49 30%, white 70%)',
               display: 'flex', flexDirection: 'column', gap: 10,
             }}>

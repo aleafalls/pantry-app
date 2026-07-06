@@ -7,9 +7,7 @@ import PageHeader from '@/components/layout/PageHeader'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel,
-} from '@/components/ui/select'
+import DrawerSelect from '@/components/ui/DrawerSelect'
 import QuantityStepper from '@/components/add/QuantityStepper'
 import LocationSelector from '@/components/add/LocationSelector'
 import TagInput from '@/components/add/TagInput'
@@ -114,16 +112,13 @@ function NewItemForm() {
         {/* Category */}
         <div className="flex flex-col gap-2">
           <Label style={{ color: 'var(--foreground)' }}>Category</Label>
-          <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger className="rounded-xl py-3 text-sm h-auto" style={inputStyle}>
-              <SelectValue placeholder="Select a category" />
-            </SelectTrigger>
-            <SelectContent>
-              {CATEGORIES.map(cat => (
-                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <DrawerSelect
+            title="Category"
+            value={category}
+            onChange={setCategory}
+            placeholder="Select a category"
+            options={CATEGORIES.map(c => ({ value: c, label: c }))}
+          />
         </div>
 
         {/* Location */}
@@ -135,21 +130,17 @@ function NewItemForm() {
         {/* Unit */}
         <div className="flex flex-col gap-2">
           <Label style={{ color: 'var(--foreground)' }}>Unit</Label>
-          <Select value={unit} onValueChange={setUnit}>
-            <SelectTrigger className="rounded-xl py-3 text-sm h-auto" style={inputStyle}>
-              <SelectValue placeholder="Select a unit" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(UNITS_GROUPED).map(([group, units]) => (
-                <SelectGroup key={group}>
-                  <SelectLabel>{group}</SelectLabel>
-                  {units.map(u => (
-                    <SelectItem key={u} value={u}>{u}</SelectItem>
-                  ))}
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
+          <DrawerSelect
+            title="Unit"
+            value={unit}
+            onChange={setUnit}
+            placeholder="Select a unit"
+            groups={Object.entries(UNITS_GROUPED).map(([label, units]) => ({
+              label,
+              options: units.map(u => ({ value: u, label: u })),
+            }))}
+            searchable
+          />
         </div>
 
         {/* Purchase date */}
