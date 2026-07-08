@@ -10,11 +10,33 @@ const AVATAR_COLORS = [
   { bg: '#7C5CBF', text: '#ffffff' },
 ]
 
-function getGreeting() {
-  const hour = new Date().getHours()
-  if (hour < 12) return 'Good morning'
-  if (hour < 17) return 'Good afternoon'
-  return 'Good evening'
+const PHRASES = [
+  "What's cookin' at",
+  "Yes, chef!",
+  "What's on the menu?",
+  "Looking delicious,",
+  "Time to stock up,",
+  "Hungry over at",
+  "Fridge check at",
+  "Let's eat well,",
+  "What's for dinner,",
+  "Pantry goals at",
+  "Good eats ahead,",
+  "Chef's kiss to",
+  "Running the kitchen at",
+  "Stocking up at",
+  "Pantry check,",
+  "Mise en place at",
+  "No reservations needed at",
+  "Tonight's special:",
+  "Fork yeah,",
+  "The secret ingredient is",
+]
+
+// Pick a phrase that rotates daily and stays stable within the session
+function getDailyPhrase() {
+  const dayIndex = Math.floor(Date.now() / 86400000)
+  return PHRASES[dayIndex % PHRASES.length]
 }
 
 interface Props {
@@ -23,8 +45,8 @@ interface Props {
 }
 
 export default function DashboardHeader({ householdName, members }: Props) {
-  const [greeting, setGreeting] = useState('')
-  useEffect(() => { setGreeting(getGreeting()) }, [])
+  const [phrase, setPhrase] = useState('')
+  useEffect(() => { setPhrase(getDailyPhrase()) }, [])
 
   return (
     <header
@@ -46,7 +68,7 @@ export default function DashboardHeader({ householdName, members }: Props) {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <span style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 500 }}>
-            {greeting || ' '}
+            {phrase || ' '}
           </span>
           <span style={{
             fontSize: 22,

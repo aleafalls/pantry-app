@@ -19,22 +19,26 @@ export default function RecipeTeaser() {
           textAlign: 'left', cursor: 'pointer',
           border: '1px solid oklch(100% 0 0 / 0.5)',
           background: 'linear-gradient(135deg, #FFD333, #FFE680)',
-          boxShadow: '0 1px 0 oklch(100% 0 0 / 0.6) inset, 0 6px 16px -10px #FFD33399',
+          boxShadow: 'oklch(1 0 0 / 0.7) 0px 0px 0px inset, oklch(0.3 0.02 85 / 0.25) 0px 4px 14px -8px',
         }}
       >
-        <div style={{ position: 'absolute', pointerEvents: 'none', top: '-30%', left: '-10%', width: '60%', height: '160%', background: 'linear-gradient(120deg, oklch(100% 0 0 / 0.55), oklch(100% 0 0 / 0))', transform: 'rotate(-12deg)' }} />
+        {/* Sheen — z-index 0 so content renders above it */}
+        <div style={{ position: 'absolute', pointerEvents: 'none', zIndex: 0, top: '-30%', left: '-10%', width: '60%', height: '160%', background: 'linear-gradient(120deg, oklch(100% 0 0 / 0.55), oklch(100% 0 0 / 0))', transform: 'rotate(-12deg)' }} />
 
-        <div className="shrink-0 flex items-center justify-center"
-          style={{ width: 38, height: 38, borderRadius: 11, fontSize: 19, background: 'oklch(99% 0.01 85 / 0.55)', backdropFilter: 'blur(6px)', border: '1px solid oklch(100% 0 0 / 0.6)' }}>
-          🍳
+        {/* Content sits above sheen */}
+        <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
+          <div className="shrink-0 flex items-center justify-center"
+            style={{ width: 38, height: 38, borderRadius: 11, fontSize: 19, background: 'oklch(99% 0.01 85 / 0.55)', backdropFilter: 'blur(6px)', border: '1px solid oklch(100% 0 0 / 0.6)' }}>
+            🍳
+          </div>
+
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-bold" style={{ color: '#4A3300' }}>What can I make?</span>
+            <span className="text-xs" style={{ color: '#7A5200' }}>Get recipes from what you have</span>
+          </div>
+
+          <i className="fi-rr-arrow-right" style={{ marginLeft: 'auto', fontSize: 16, display: 'block', lineHeight: 1, color: '#7A5200', flexShrink: 0 }} />
         </div>
-
-        <div className="flex flex-col gap-0.5">
-          <span className="text-sm font-bold" style={{ color: '#4A3300' }}>What can I make?</span>
-          <span className="text-xs" style={{ color: '#7A5200' }}>Get recipes from what you have</span>
-        </div>
-
-        <span className="ml-auto text-lg" style={{ color: '#7A5200' }}>›</span>
       </button>
 
       <Sheet open={open} onOpenChange={setOpen}>

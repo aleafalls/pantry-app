@@ -10,12 +10,12 @@ const figtree = Figtree({
 })
 
 export const metadata: Metadata = {
-  title: 'Pantry',
+  title: 'Lemmy',
   description: 'Shared household pantry tracker',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Pantry',
+    title: 'Lemmy',
   },
 }
 
@@ -36,6 +36,8 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="/fonts/uicons/uicons-regular-rounded.css" />
         <link rel="stylesheet" href="/fonts/uicons/uicons-solid-rounded.css" />
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/logo.png" />
       </head>
       <body>
         <div style={{ maxWidth: 660, margin: '0 auto', minHeight: '100vh', position: 'relative' }}>
