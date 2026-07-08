@@ -1089,4 +1089,29 @@ Use this to track overall progress across phases.
 
 ---
 
+## Security Checklist
+
+Not a build phase — a set of checks worth running through before opening the app to more testers, and periodically after. Unlike the phases above, these don't have a natural "done" point; revisit this list whenever credentials, tables, or API routes change.
+
+### Credentials
+
+- [ ] Git remote uses a safe auth method — SSH key or `gh auth login` (stores credentials in the system keychain) — **not** a personal access token embedded in the remote URL.
+  > ⚠️ **Found 2026-07:** the `origin` remote had a GitHub token embedded in plain text (`https://user:TOKEN@github.com/...`), visible in `.git/config`. Revoke the old token at [github.com/settings/tokens](https://github.com/settings/tokens) and reconfigure the remote before relying on this checklist item.
+- [ ] `.env.local` has never been committed (already covered by `.gitignore` — if ever in doubt, `git log --all --full-history -- .env.local` should return nothing).
+- [ ] Only `NEXT_PUBLIC_SUPABASE_URL` and the Supabase **anon** key are public. Any other secret — `ANTHROPIC_API_KEY` (Phase 13), a Supabase service role key, etc. — lives in `.env.local` and Vercel's Environment Variables only. Never prefix a secret with `NEXT_PUBLIC_`; never reference it from client-side (`'use client'`) code.
+- [ ] Vercel's Environment Variables match `.env.local` after adding any new key locally — Vercel won't pick up local-only additions automatically.
+
+### Data isolation
+
+- [ ] RLS is enabled on every table, including ones added outside Phase 1 (`stores`, and later `recipes`, `recipe_ingredients`, `household_preferences`) — spot-check in Table Editor after creating any new table, not just at initial setup.
+- [ ] Owner-only actions (removing a member) are enforced by a database policy (`is_household_owner()`, Phase 10), not just hidden in the UI — a determined user could otherwise call the API directly.
+- [ ] Invite codes are low-entropy by design (8 words × 90 numbers = 720 combinations, e.g. `PINE-42`) — fine for a small circle of people you've personally invited, but don't treat them as real access control if the household roster grows beyond that. Worth revisiting (longer codes, or an approval step before someone joins) if the app is ever shared more broadly.
+
+### API routes
+
+- [ ] Routes under `/api/*` are covered by the auth middleware matcher (confirmed for `/api/barcode/[barcode]`) — check any newly added route isn't accidentally excluded the way `manifest.json` was.
+- [ ] No API route trusts a client-supplied `household_id` for anything sensitive without verifying it against the requesting user's actual household.
+
+---
+
 *End of document*
