@@ -34,7 +34,6 @@ interface Item {
   default_unit: string
   default_restock_qty: number | null
   preferred_stores: string[]
-  tags: string[]
   auto_shopping_list: boolean | null
 }
 

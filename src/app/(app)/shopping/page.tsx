@@ -92,7 +92,7 @@ export default function ShoppingPage() {
         .order('added_at', { ascending: true }),
       supabase.from('stores').select('name').eq('household_id', hid).order('name'),
     ])
-    const typed = (listItems ?? []) as ShoppingItem[]
+    const typed = (listItems ?? []) as unknown as ShoppingItem[]
     setItems(typed)
     // Initialise quantity map: prefer saved quantity → item default → 1
     setQuantities(prev => {
