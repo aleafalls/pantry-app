@@ -37,7 +37,7 @@ export default function RootLayout({
         <link rel="stylesheet" href="/fonts/uicons/uicons-regular-rounded.css" />
         <link rel="stylesheet" href="/fonts/uicons/uicons-solid-rounded.css" />
         <link rel="manifest" href="/manifest.json" />
-        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="apple-touch-icon" href="/icon-180.png" />
       </head>
       <body>
         <div style={{ maxWidth: 660, margin: '0 auto', minHeight: '100vh', position: 'relative' }}>

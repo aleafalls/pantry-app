@@ -18,6 +18,7 @@ import { CATEGORIES, UNITS_GROUPED, LOCATIONS } from '@/lib/constants'
 function NewItemForm() {
   const searchParams = useSearchParams()
   const shoppingListId = searchParams.get('shoppingListId')
+  const barcode = searchParams.get('barcode')
 
   // ── Identity ──────────────────────────────────────────────
   function toTitleCase(str: string) {
@@ -36,7 +37,7 @@ function NewItemForm() {
   // ── Details ───────────────────────────────────────────────
   const [lowThreshold, setLowThreshold] = useState(2)
   const [autoShoppingList, setAutoShoppingList] = useState(true)
-  const [category, setCategory] = useState('')
+  const [category, setCategory] = useState(searchParams.get('category') ?? '')
   const [preferredStores, setPreferredStores] = useState<string[]>([])
   const [householdStores, setHouseholdStores] = useState<string[]>([])
   const [tags, setTags] = useState<string[]>([])
@@ -94,6 +95,7 @@ function NewItemForm() {
       tags,
       preferred_stores: preferredStores,
       auto_shopping_list: autoShoppingList,
+      barcode: barcode || null,
       active: true,
     })
 

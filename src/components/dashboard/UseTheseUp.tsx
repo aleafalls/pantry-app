@@ -1,7 +1,9 @@
+import Link from 'next/link'
+
 interface InventoryRow {
   id: string
   purchase_date: string
-  items: { name: string; emoji: string | null }
+  items: { id: string; name: string; emoji: string | null }
 }
 interface Props { items: InventoryRow[] }
 
@@ -23,9 +25,9 @@ export default function UseTheseUp({ items }: Props) {
       </span>
       <div className="no-scrollbar flex gap-2 overflow-x-auto -mx-5 px-5 pb-1">
         {items.slice(0, 5).map(inv => (
-          <div key={inv.id}
+          <Link key={inv.id} href={`/inventory/${inv.items.id}`}
             className="shrink-0 flex flex-col gap-1 rounded-xl py-2 px-3 min-w-108px"
-            style={{ background: 'var(--surface)' }}>
+            style={{ background: 'var(--surface)', textDecoration: 'none' }}>
             <span className="text-lg leading-none">{inv.items.emoji ?? '📦'}</span>
             <span className="text-xs font-bold leading-snug" style={{ color: 'var(--foreground)' }}>
               {inv.items.name}
@@ -33,7 +35,7 @@ export default function UseTheseUp({ items }: Props) {
             <span className="text-105" style={{ color: 'var(--muted-light)' }}>
               {weeksAgo(inv.purchase_date)}
             </span>
-          </div>
+          </Link>
         ))}
       </div>
     </div>

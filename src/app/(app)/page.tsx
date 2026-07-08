@@ -25,7 +25,7 @@ export default async function DashboardPage() {
 
   const { data: members } = await supabase
     .from('profiles')
-    .select('display_name')
+    .select('display_name, avatar_emoji')
     .eq('household_id', profile.household_id)
 
   const { data: inventory } = await supabase

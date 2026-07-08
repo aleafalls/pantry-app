@@ -1,4 +1,6 @@
-import Link from 'next/link'
+'use client'
+
+import { useRouter } from 'next/navigation'
 
 interface Props {
   title: string
@@ -9,6 +11,19 @@ interface Props {
 }
 
 export default function PageHeader({ title, backHref, rightAction, children }: Props) {
+  const router = useRouter()
+
+  // Prefer real browser-history back so the button returns to wherever the
+  // user actually came from. backHref is only a fallback for the rare case
+  // of landing here with no in-app history (e.g. a fresh tab / direct load).
+  function handleBack() {
+    if (backHref && window.history.length <= 1) {
+      router.push(backHref)
+    } else {
+      router.back()
+    }
+  }
+
   return (
     <div
       style={{
@@ -29,13 +44,17 @@ export default function PageHeader({ title, backHref, rightAction, children }: P
       <div style={{ display: 'flex', alignItems: 'center' }}>
         <div style={{ width: 32, flexShrink: 0 }}>
           {backHref && (
-            <Link
-              href={backHref}
-              style={{ color: 'var(--muted)', textDecoration: 'none', lineHeight: 1, display: 'block' }}
+            <button
+              type="button"
+              onClick={handleBack}
+              style={{
+                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                color: 'var(--muted)', lineHeight: 1, display: 'block',
+              }}
               aria-label="Go back"
             >
               <i className="fi-rr-angle-left" style={{ fontSize: 18, display: 'block' }} />
-            </Link>
+            </button>
           )}
         </div>
 

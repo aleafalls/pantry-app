@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import PageHeader from '@/components/layout/PageHeader'
 import AppBackground from '@/components/layout/AppBackground'
+import BarcodeScanner from '@/components/add/BarcodeScanner'
 
 interface HouseholdItem {
   id: string
@@ -34,6 +35,8 @@ export default function AddPage() {
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([])
   const [loading, setLoading] = useState(false)
   const [householdId, setHouseholdId] = useState<string | null>(null)
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const [scanLookupLoading, setScanLookupLoading] = useState(false)
 
   // Load household id on mount + auto-focus
   useEffect(() => {
@@ -85,6 +88,42 @@ export default function AddPage() {
     router.push(`/add/restock?catalogId=${item.id}`)
   }
 
+  async function handleBarcodeScan(barcode: string) {
+    setScannerOpen(false)
+    setScanLookupLoading(true)
+    const supabase = createClient()
+
+    // 1. Already in this household? → straight to restock.
+    if (householdId) {
+      const { data: existing } = await supabase
+        .from('items')
+        .select('id')
+        .eq('household_id', householdId)
+        .eq('barcode', barcode)
+        .eq('active', true)
+        .maybeSingle()
+
+      if (existing) {
+        router.push(`/add/restock/${existing.id}`)
+        return
+      }
+    }
+
+    // 2. Not in household — look it up via Open Food Facts.
+    try {
+      const res = await fetch(`/api/barcode/${encodeURIComponent(barcode)}`)
+      const data = await res.json()
+      const params = new URLSearchParams({ barcode })
+      if (data.found && data.name) params.set('name', data.name)
+      if (data.found && data.category) params.set('category', data.category)
+      router.push(`/add/new?${params.toString()}`)
+    } catch {
+      router.push(`/add/new?barcode=${encodeURIComponent(barcode)}`)
+    } finally {
+      setScanLookupLoading(false)
+    }
+  }
+
   const hasResults = householdItems.length > 0 || catalogItems.length > 0
   const showCreate = query.trim().length > 0
 
@@ -119,9 +158,9 @@ export default function AddPage() {
                 padding: '10px 40px 10px 14px',
               }}
             />
-            {/* Barcode icon placeholder — Phase 12 */}
             <button
               type="button"
+              onClick={() => setScannerOpen(true)}
               style={{
                 position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
                 fontSize: 18, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
@@ -134,6 +173,18 @@ export default function AddPage() {
           </div>
         </div>
       </div>
+
+      <BarcodeScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScan={handleBarcodeScan}
+      />
+
+      {scanLookupLoading && (
+        <div style={{ padding: '20px', textAlign: 'center' }}>
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>Looking up barcode…</p>
+        </div>
+      )}
 
       {/* Results */}
       <div style={{ padding: '8px 0' }}>

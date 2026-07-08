@@ -1,6 +1,6 @@
 # Pantry App — Build Plan
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Last Updated:** July 2026  
 **Stack:** Next.js · shadcn/ui · Supabase · Tailwind CSS · UIcons · Figtree  
 
@@ -39,7 +39,9 @@ This document is the step-by-step guide for building the pantry app from zero to
 12. [Phase 11 — PWA Configuration](#phase-11--pwa-configuration)
 13. [Phase 12 — Barcode Scanning *(Phase 2)*](#phase-12--barcode-scanning-phase-2)
 14. [Phase 13 — AI Features *(Phase 2)*](#phase-13--ai-features-phase-2)
-15. [Phase 14 — Recipe Suggestions *(Phase 3)*](#phase-14--recipe-suggestions-phase-3)
+15. [Phase 14 — Chef: Recipes & AI Suggestions *(Phase 3)*](#phase-14--chef-recipes--ai-suggestions-phase-3)
+16. [Phase 15 — Chef: Web Recipe Import *(Phase 3)*](#phase-15--chef-web-recipe-import-phase-3)
+17. [Phase 16 — Chef: Photo Recipe Import *(Phase 3)*](#phase-16--chef-photo-recipe-import-phase-3)
 
 ---
 
@@ -458,7 +460,7 @@ For partners and testers joining an existing household.
 
 1. 🤖 **Claude writes:** `src/components/dashboard/RecipeTeaser.tsx` — the yellow gradient "What can I make?" button.
    - In Phase 1, tapping opens a bottom sheet saying "Recipe suggestions coming soon."
-   - The button is fully styled as designed and wired up in Phase 14.
+   - The button is fully styled as designed. Wired up in Phase 14 to route to `/chef` (Suggestions tab) — not a standalone `/recipes` route, since Chef is now the dedicated recipe hub.
 
 ---
 
@@ -484,11 +486,13 @@ For partners and testers joining an existing household.
 ### 6.6 — Bottom Navigation
 
 1. 🤖 **Claude writes:** `src/components/layout/BottomNav.tsx` — floating glass dock:
-   - 5 tabs: Home (`fi-rr-home`), Inventory (`fi-rr-box`), Add (+), Shopping List (`fi-rr-shopping-cart`), Settings (`fi-rr-settings`).
+   - 5 tabs: Home (`fi-sr-home`), Inventory (`fi-sr-carrot`), Add (+), Shopping List (`fi-sr-shopping-cart-check`), Chef (`fi-sr-user-chef`).
    - The Add (+) button uses a yellow gradient circle that floats above the nav.
    - Active tab renders at full opacity; inactive at 0.4.
    - Shopping List tab badge shows pending item count.
 2. 🤖 **Claude writes:** Update to the app layout to include BottomNav on all app screens.
+
+> ⚠️ **Settings is not a bottom nav tab.** Chef took the 5th slot instead. Settings is reached via the avatar/profile icon in the header — see Phase 10.0.
 
 ✅ **Verify:** Open the app on your phone. The dashboard loads with real data from Supabase (will be empty until items are added). Navigation between tabs works.
 
@@ -688,7 +692,16 @@ Supabase Realtime subscription on `shopping_list` table already enabled in Phase
 
 ## Phase 10 — Settings Screen
 
-**Goal:** Implement household settings and the invite flow entry point.
+**Goal:** Implement household settings and the invite flow entry point, reached via an avatar icon in the header rather than the bottom nav (Chef took that slot — see Phase 6.6).
+
+---
+
+### 10.0 — Settings Entry Point (Header Avatar)
+
+1. 🤖 **Claude writes:** Add a tappable avatar/profile icon to `PageHeader` (or the `(app)` layout, if it should appear on every screen including the dashboard) — initials in a yellow/teal circle, consistent with the existing avatar-stack style from Phase 6.1.
+2. 🤖 **Claude writes:** Tapping the avatar routes to `/settings`.
+
+✅ **Verify:** The avatar icon appears on every app screen and opens Settings from anywhere.
 
 ---
 
@@ -696,10 +709,14 @@ Supabase Realtime subscription on `shopping_list` table already enabled in Phase
 
 1. 🤖 **Claude writes:** `src/app/(app)/settings/page.tsx`:
    - **Household name** — editable inline.
+   - **Household location** — e.g., "Chicago, IL." Used as regional context for AI price estimates (Phase 13.3).
+   - **Default servings** — number, used to scale AI recipe suggestions (Phase 14) to the household's actual size.
    - **Members** — list of current household members (names and avatars).
    - **Invite someone** — shows the invite code and two buttons: "Copy invite link" and "Copy code."
    - **Your name** — editable display name.
    - **Sign out** button.
+
+> ⚠️ Location and default servings live here because they're core household attributes already in the Phase 1 data model. Diet/cuisine/macro preferences are a separate concern — see Phase 14.1 — and live inside Chef instead, next to where they're actually used.
 
 ✅ **Verify:** Tap "Copy invite link." Paste it in a browser or Messages — it opens the app at the join screen with the code pre-filled.
 
@@ -808,11 +825,12 @@ iOS doesn't auto-prompt users to install a PWA. We need a manual nudge.
 
 ### 13.3 — AI Pantry Value Estimate
 
-1. 🧑‍💻 In the Supabase Settings screen, add a **Household location** field (e.g., "Chicago, IL"). This gives Claude location context for price estimates.
-2. 🤖 **Claude writes:** `src/app/api/ai/price/route.ts` — takes item name, category, unit, and location, returns an estimated price per unit.
-3. 🤖 **Claude writes:** The trigger that calls this API after a new item is saved, storing the result in `items.estimated_price`.
-4. 🤖 **Claude writes:** The **Est. value** stat card on the dashboard, now showing the summed estimate.
-5. 🤖 **Claude writes:** A "Refresh estimates" button in Settings that re-runs price estimation for all items.
+Uses the household location captured in Settings (Phase 10.1) as regional price context — no separate location field needed here.
+
+1. 🤖 **Claude writes:** `src/app/api/ai/price/route.ts` — takes item name, category, unit, and location, returns an estimated price per unit.
+2. 🤖 **Claude writes:** The trigger that calls this API after a new item is saved, storing the result in `items.estimated_price`.
+3. 🤖 **Claude writes:** The **Est. value** stat card on the dashboard, now showing the summed estimate.
+4. 🤖 **Claude writes:** A "Refresh estimates" button in Settings that re-runs price estimation for all items.
 
 ---
 
@@ -824,38 +842,202 @@ For items added before AI emoji was available.
 
 ---
 
-## Phase 14 — Recipe Suggestions *(Phase 3)*
+## Phase 14 — Chef: Recipes & AI Suggestions *(Phase 3)*
 
-**Goal:** Wire up the "What can I make?" recipe flow using Claude AI.
+**Goal:** Turn the Chef tab from its "coming soon" placeholder into a real recipe hub — recipes the household saves manually, plus AI-generated suggestions based on current inventory. This replaces the original standalone `/recipes` page concept; Chef is now the single home for all recipe features, including the imports built in Phases 15–16.
 
----
-
-### 14.1 — Recipe Suggestions API Route
-
-1. 🤖 **Claude writes:** `src/app/api/ai/recipes/route.ts` — passes the full inventory list to Claude with instructions to prioritize oldest items and minimize missing ingredients. Returns 3–5 recipe suggestions.
+> ⚠️ This phase is scoped intentionally to skip web/photo import — those are separate phases (15, 16) since they carry their own external-fetch and AI-cost risk. Ship this phase first.
 
 ---
 
-### 14.2 — Recipe Results Screen
+### 14.0 — Recipes Data Model (Supabase)
 
-1. 🤖 **Claude writes:** `src/app/(app)/recipes/page.tsx`:
-   - Card list of 3–5 recipe suggestions.
-   - Each card: recipe name, 1-sentence description, pantry items used, additional ingredients needed, match score ("You have 8 of 10 ingredients").
-   - Expandable on tap.
+**New database objects (user runs in Supabase SQL Editor), household-scoped with RLS like `stores` in 9.0:**
+
+```sql
+create table public.recipes (
+  id uuid primary key default uuid_generate_v4(),
+  household_id uuid not null references public.households(id),
+  name text not null,
+  source text not null default 'manual', -- 'manual' | 'web' | 'photo' | 'ai'
+  source_url text,
+  image_url text,
+  servings int,
+  instructions text,
+  created_by uuid references public.profiles(id),
+  created_at timestamptz default now()
+);
+alter table public.recipes enable row level security;
+create policy "Recipes readable by household" on public.recipes for select to authenticated using (household_id = public.get_my_household_id());
+create policy "Recipes insertable by household" on public.recipes for insert to authenticated with check (household_id = public.get_my_household_id());
+create policy "Recipes updatable by household" on public.recipes for update to authenticated using (household_id = public.get_my_household_id());
+create policy "Recipes deletable by household" on public.recipes for delete to authenticated using (household_id = public.get_my_household_id());
+
+create table public.recipe_ingredients (
+  id uuid primary key default uuid_generate_v4(),
+  recipe_id uuid not null references public.recipes(id) on delete cascade,
+  name text not null,
+  quantity text,
+  unit text,
+  matched_item_id uuid references public.items(id)
+);
+alter table public.recipe_ingredients enable row level security;
+create policy "Recipe ingredients readable by household" on public.recipe_ingredients for select to authenticated using (
+  recipe_id in (select id from public.recipes where household_id = public.get_my_household_id())
+);
+create policy "Recipe ingredients writable by household" on public.recipe_ingredients for all to authenticated using (
+  recipe_id in (select id from public.recipes where household_id = public.get_my_household_id())
+);
+```
+
+`matched_item_id` is nullable and populated later (14.5) to score a recipe against current inventory.
+
+✅ **Verify:** Table Editor shows `recipes` and `recipe_ingredients` with RLS enabled.
 
 ---
 
-### 14.3 — Shopping List Integration
+### 14.1 — Chef Preferences (Data Model + Screen)
 
-1. 🤖 **Claude writes:** "Add missing ingredients to list" button on each recipe card — writes missing ingredients to `shopping_list` with `reason: recipe`.
+Household-level dietary, cuisine, and macro preferences that steer every AI suggestion built in 14.5. Shared across the household, not per-member — matches how inventory, shopping list, and recipes already work.
+
+**New database object (user runs in Supabase SQL Editor):**
+
+```sql
+create table public.household_preferences (
+  household_id uuid primary key references public.households(id) on delete cascade,
+  dietary_restrictions text[] default '{}',
+  favorite_cuisines text[] default '{}',
+  macro_goals text[] default '{}',
+  other_notes text,
+  updated_at timestamptz default now()
+);
+alter table public.household_preferences enable row level security;
+create policy "Household preferences readable by household" on public.household_preferences for select to authenticated using (household_id = public.get_my_household_id());
+create policy "Household preferences insertable by household" on public.household_preferences for insert to authenticated with check (household_id = public.get_my_household_id());
+create policy "Household preferences updatable by household" on public.household_preferences for update to authenticated using (household_id = public.get_my_household_id());
+```
+
+1. 🤖 **Claude writes:** A preferences icon on the Chef tab (`src/app/(app)/chef/page.tsx`) that opens `src/app/(app)/chef/preferences/page.tsx`. Lives in Chef, not the main Settings screen — it's edited right next to where it's used.
+2. 🤖 **Claude writes:** The preferences screen:
+   - **Dietary restrictions** — checkbox list (vegetarian, vegan, gluten-free, dairy-free, nut-free, shellfish-free, kosher, halal, pescatarian, keto, paleo) + free-text "other" field.
+   - **Favorite cuisines** — multi-select pills, reusing the `DrawerSelect` multi-select mode from Phase 9.1 (Italian, Mexican, Japanese, Chinese, Indian, Mediterranean, Thai, French, American comfort, + "Add a cuisine" for custom entries).
+   - **Macro/health goals** — multi-select pills, qualitative only (high protein, low carb, high fiber, low sodium). Not numeric calorie/macro tracking — that's a different app.
+   - "Save preferences" CTA — upserts the single `household_preferences` row.
+
+> ⚠️ Every checked dietary restriction is a hard exclude in the AI prompt (14.5) — no distinction between "allergy" and "lifestyle preference." Simpler to build and the safer default when suggestions involve food someone might actually eat. Favorite cuisines and macro goals are soft ranking boosts only.
+
+✅ **Verify:** Set a dietary restriction (e.g., "vegetarian") and a favorite cuisine, save, and confirm the row appears in `household_preferences` in Table Editor.
 
 ---
 
-### 14.4 — Wire Up the Recipe Teaser
+### 14.2 — Anthropic API Key
 
-1. 🤖 **Claude writes:** Update `RecipeTeaser.tsx` — removes the "coming soon" state, now routes to `/recipes`.
+Already done if Phase 13 is complete. If not, do step 13.1 first — this phase's AI suggestions need `ANTHROPIC_API_KEY` in `.env.local` and Vercel.
 
-✅ **Verify:** Tap "What can I make?" on the dashboard. 3–5 recipe cards load based on your actual pantry inventory.
+---
+
+### 14.3 — Manual Recipe Save Flow
+
+1. 🤖 **Claude writes:** `src/app/(app)/chef/new/page.tsx` — form to save a recipe by hand:
+   - Name, servings, ingredients (reusing the `TagInput` pattern for add/remove rows: name + quantity + unit), instructions (multi-line text).
+   - "Save recipe" CTA — writes to `recipes` and `recipe_ingredients`.
+   - No photo field yet — added in Phase 16 once the storage bucket exists.
+
+---
+
+### 14.4 — Chef Tab: Tabs, My Recipes, Recipe Detail
+
+1. 🤖 **Claude writes:** Replace the placeholder in `src/app/(app)/chef/page.tsx` with a two-tab layout: **Suggestions** / **My Recipes**.
+2. 🤖 **Claude writes:** My Recipes tab — card list of saved recipes (name, image if present, ingredient count). Empty state prompts "Save your first recipe" → routes to `chef/new`.
+3. 🤖 **Claude writes:** `src/app/(app)/chef/[recipeId]/page.tsx` — recipe detail: ingredients, instructions, edit and delete actions.
+
+---
+
+### 14.5 — AI Recipe Suggestions
+
+1. 🤖 **Claude writes:** `src/app/api/ai/recipes/route.ts` — passes the full inventory list plus the household's `household_preferences` (14.1) and `default_servings` (Phase 10.1) to Claude. Dietary restrictions are hard excludes; favorite cuisines and macro goals are soft ranking boosts. Prioritizes oldest and low-stock inventory items, minimizes missing ingredients. Returns 3–5 suggestions.
+2. 🤖 **Claude writes:** Suggestions tab UI — card list, each card: recipe name, 1-sentence description, pantry items used, additional ingredients needed, match score ("You have 8 of 10 ingredients"). Expandable on tap.
+3. 🤖 **Claude writes:** "Add missing ingredients to list" button on each suggestion card — writes missing ingredients to `shopping_list` with `reason: recipe`.
+
+---
+
+### 14.6 — Wire Up the Dashboard Recipe Teaser
+
+1. 🤖 **Claude writes:** Update `RecipeTeaser.tsx` — removes the "coming soon" state, now routes to `/chef` (Suggestions tab).
+
+✅ **Verify:** Tap "What can I make?" on the dashboard — lands on the Chef Suggestions tab with 3–5 recipe cards from real inventory. Save a manual recipe via `chef/new` — it appears in My Recipes and its detail page opens.
+
+---
+
+## Phase 15 — Chef: Web Recipe Import *(Phase 3)*
+
+**Goal:** Paste a recipe URL and auto-fill a new recipe. Try the site's own structured recipe data first (free, no AI cost); fall back to Claude extraction only when a site doesn't provide it.
+
+---
+
+### 15.1 — Import Entry Point
+
+1. 🤖 **Claude writes:** `src/app/(app)/chef/import/page.tsx` — URL input field + "Import" button. (Phase 16 adds a photo option to this same screen.)
+
+---
+
+### 15.2 — Recipe Schema.org Parser (Server Route)
+
+1. 🤖 **Claude writes:** `src/app/api/recipes/import/route.ts` (POST `{ url }`) — fetches the page server-side and looks for `schema.org/Recipe` structured data (JSON-LD), which most recipe blogs already embed for Google search.
+2. 🤖 **Claude writes:** Extracts name, ingredients (with quantity/unit where parseable), instructions, servings, and image URL from the structured data.
+
+> ⚠️ Structured data shows up in a few different shapes (a plain `Recipe` object, an array of types, or nested under `@graph`) — the parser needs to handle the common variants, not just one.
+
+---
+
+### 15.3 — Claude Fallback Extraction
+
+1. 🤖 **Claude writes:** When no structured data is found, send the page's main text content to Claude with instructions to extract the same structured fields (name, ingredients with quantity/unit, instructions, servings).
+
+---
+
+### 15.4 — Pre-fill & Confirm Screen
+
+1. 🤖 **Claude writes:** Extracted data pre-fills the same form built in 14.3, so the user reviews and edits before saving — never auto-save without confirmation, since extraction (especially the Claude fallback) can be wrong.
+
+✅ **Verify:** Paste a URL from a well-known recipe blog — fields pre-fill correctly from structured data. Paste a URL from a site with no structured data — the Claude fallback still produces reasonable fields to review and edit.
+
+---
+
+## Phase 16 — Chef: Photo Recipe Import *(Phase 3)*
+
+**Goal:** Import a recipe from a photo — a cookbook page, a handwritten recipe card, a photographed print-out — using Claude's vision capability.
+
+---
+
+### 16.1 — Supabase Storage Bucket for Recipe Photos
+
+1. 🧑‍💻 In Supabase, create a `recipe-photos` storage bucket.
+2. 🤖 **Claude provides:** Storage RLS policies scoped by household, matching the pattern used for the rest of the app's data.
+
+✅ **Verify:** The bucket appears in Storage with policies applied.
+
+---
+
+### 16.2 — Photo Capture/Upload UI
+
+1. 🤖 **Claude writes:** Add an "or import from a photo" option to `chef/import/page.tsx` — opens the camera or a photo picker, similar in spirit to `BarcodeScanner` from Phase 12 but capturing a single still image instead of continuously scanning.
+
+---
+
+### 16.3 — Claude Vision Extraction Route
+
+1. 🤖 **Claude writes:** `src/app/api/recipes/import-photo/route.ts` — sends the photo to Claude with instructions to extract the same structured recipe fields as 15.3.
+
+> ⚠️ Photo payloads are larger than a page-text extraction and cost more per call — this is the most expensive of the three capture paths. Worth confirming actual per-call cost once this is live.
+
+---
+
+### 16.4 — Pre-fill & Confirm Screen
+
+1. 🤖 **Claude writes:** Reuses the confirm/edit screen from 15.4 — same review-before-save principle applies, especially for handwriting, which is the least reliable input for this flow.
+
+✅ **Verify:** Take a photo of a printed recipe — fields pre-fill reasonably. Take a photo of a handwritten recipe card — check quality; if handwriting recognition is unreliable, that's worth flagging as a known limitation rather than something to keep tuning.
 
 ---
 
@@ -884,21 +1066,26 @@ Use this to track overall progress across phases.
 - [ ] Add item — search + catalog + restock + new item form
 - [ ] Inventory browser + item detail view
 - [ ] Shopping list — auto, manual, check-off, realtime
-- [ ] Settings screen with invite sharing
+- [ ] Bottom nav — Home, Inventory, Add, Shopping, Chef
+- [ ] Settings screen, reached via header avatar (not bottom nav) — includes household location + default servings
 
 ### Phase 2 — Smart Capture
 - [ ] Barcode scanner (camera)
 - [ ] Open Food Facts lookup
 - [ ] AI emoji assignment
 - [ ] AI pantry value estimate
-- [ ] Household location in Settings
 - [ ] Batch emoji enrichment
 
 ### Phase 3 — AI Intelligence
-- [ ] Recipe suggestions API route
-- [ ] Recipe results screen
+- [ ] Recipes + recipe_ingredients tables with RLS
+- [ ] Household preferences table + Chef preferences screen (dietary restrictions, cuisines, macro goals)
+- [ ] Manual recipe save flow
+- [ ] Chef tab — Suggestions / My Recipes / recipe detail
+- [ ] Recipe suggestions API route (uses household preferences + default servings)
 - [ ] Missing ingredients → shopping list
-- [ ] Recipe teaser wired to live flow
+- [ ] Recipe teaser wired to Chef
+- [ ] Web import — schema.org parser + Claude fallback
+- [ ] Photo import — storage bucket + Claude vision extraction
 
 ---
 

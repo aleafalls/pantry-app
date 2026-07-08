@@ -41,7 +41,7 @@ function getDailyPhrase() {
 
 interface Props {
   householdName: string
-  members: { display_name: string | null }[]
+  members: { display_name: string | null; avatar_emoji?: string | null }[]
 }
 
 export default function DashboardHeader({ householdName, members }: Props) {
@@ -94,7 +94,7 @@ export default function DashboardHeader({ householdName, members }: Props) {
                   borderRadius: '50%',
                   background: colors.bg,
                   color: colors.text,
-                  fontSize: 13,
+                  fontSize: member.avatar_emoji ? 17 : 13,
                   fontWeight: 800,
                   display: 'flex',
                   alignItems: 'center',
@@ -107,7 +107,7 @@ export default function DashboardHeader({ householdName, members }: Props) {
                   cursor: i === 0 ? 'pointer' : 'default',
                 }}
               >
-                {initial}
+                {member.avatar_emoji ?? initial}
               </div>
             )
             return i === 0 ? (

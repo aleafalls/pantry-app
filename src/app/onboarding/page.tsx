@@ -70,7 +70,7 @@ export default function OnboardingPage() {
     const householdId = crypto.randomUUID()
     const { error: householdError } = await supabase
       .from('households')
-      .insert({ id: householdId, name: householdName.trim(), invite_code: generateInviteCode(), default_low_threshold: 2 })
+      .insert({ id: householdId, name: householdName.trim(), invite_code: generateInviteCode(), default_low_threshold: 2, owner_id: user.id })
 
     if (householdError) { setError(`Household error: ${householdError.message}`); setLoading(false); return }
 

@@ -96,23 +96,69 @@ const EMOJI_GROUPS = [
   ]},
 ]
 
+// Avatar-friendly emoji set — animal faces, fun/fantasy faces, and food-related people.
+export const AVATAR_EMOJI_GROUPS = [
+  { label: 'Animal Faces', items: [
+    { e: '🐶', n: 'dog puppy' }, { e: '🐱', n: 'cat kitten' },
+    { e: '🐭', n: 'mouse' }, { e: '🐹', n: 'hamster' },
+    { e: '🐰', n: 'rabbit bunny' }, { e: '🦊', n: 'fox' },
+    { e: '🐻', n: 'bear' }, { e: '🐼', n: 'panda' },
+    { e: '🐨', n: 'koala' }, { e: '🐯', n: 'tiger' },
+    { e: '🦁', n: 'lion' }, { e: '🐮', n: 'cow' },
+    { e: '🐷', n: 'pig' }, { e: '🐸', n: 'frog' },
+    { e: '🐵', n: 'monkey' }, { e: '🙈', n: 'monkey see no evil' },
+    { e: '🙉', n: 'monkey hear no evil' }, { e: '🙊', n: 'monkey speak no evil' },
+    { e: '🐺', n: 'wolf' }, { e: '🐴', n: 'horse' },
+    { e: '🦄', n: 'unicorn' }, { e: '🐔', n: 'chicken' },
+    { e: '🐧', n: 'penguin' }, { e: '🦉', n: 'owl' },
+  ]},
+  { label: 'Fun & Fantasy', items: [
+    { e: '👻', n: 'ghost' }, { e: '😈', n: 'devil purple horns' },
+    { e: '👹', n: 'ogre' }, { e: '👺', n: 'goblin' },
+    { e: '💀', n: 'skull' }, { e: '👽', n: 'alien' },
+    { e: '👾', n: 'alien monster' }, { e: '🤖', n: 'robot' },
+    { e: '🎃', n: 'pumpkin jack o lantern halloween' },
+    { e: '🧟', n: 'zombie' }, { e: '🧛', n: 'vampire' },
+    { e: '🧙', n: 'wizard mage' }, { e: '🧚', n: 'fairy' },
+    { e: '🥷', n: 'ninja' }, { e: '🦸', n: 'superhero' },
+    { e: '🦹', n: 'supervillain' }, { e: '🤡', n: 'clown' },
+    { e: '🙃', n: 'upside down face' },
+  ]},
+  { label: 'Food People', items: [
+    { e: '🧑‍🍳', n: 'chef cook' }, { e: '👨‍🍳', n: 'man chef cook' },
+    { e: '👩‍🍳', n: 'woman chef cook' }, { e: '🧑‍🌾', n: 'farmer' },
+    { e: '👨‍🌾', n: 'man farmer' }, { e: '👩‍🌾', n: 'woman farmer' },
+  ]},
+]
+
+interface EmojiGroup {
+  label: string
+  items: { e: string; n: string }[]
+}
+
 interface Props {
   value: string | null
   onChange: (emoji: string) => void
+  groups?: EmojiGroup[]
+  fallback?: string
+  searchPlaceholder?: string
 }
 
-export default function EmojiPicker({ value, onChange }: Props) {
+export default function EmojiPicker({
+  value, onChange,
+  groups = EMOJI_GROUPS, fallback = '📦', searchPlaceholder = 'Search food emojis…',
+}: Props) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
 
   const q = search.toLowerCase().trim()
 
   const filteredGroups = useMemo(() => {
-    if (!q) return EMOJI_GROUPS
-    return EMOJI_GROUPS
+    if (!q) return groups
+    return groups
       .map(g => ({ ...g, items: g.items.filter(item => item.n.includes(q)) }))
       .filter(g => g.items.length > 0)
-  }, [q])
+  }, [q, groups])
 
   function handleSelect(emoji: string) {
     onChange(emoji)
@@ -135,7 +181,7 @@ export default function EmojiPicker({ value, onChange }: Props) {
         }}
         aria-label="Choose emoji"
       >
-        {value ?? '📦'}
+        {value ?? fallback}
       </button>
 
       <DrawerContent
@@ -203,7 +249,7 @@ export default function EmojiPicker({ value, onChange }: Props) {
             }} />
             <Input
               type="text"
-              placeholder="Search food emojis…"
+              placeholder={searchPlaceholder}
               value={search}
               onChange={e => setSearch(e.target.value)}
               autoComplete="off"

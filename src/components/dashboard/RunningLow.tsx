@@ -1,10 +1,11 @@
+import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 
 interface InventoryRow {
   id: string
   quantity: number
   location: string
-  items: { name: string; emoji: string | null }
+  items: { id: string; name: string; emoji: string | null }
 }
 interface Props {
   items: InventoryRow[]
@@ -44,15 +45,17 @@ export default function RunningLow({ items, totalLowCount }: Props) {
             {totalLowCount}
           </Badge>
         </div>
-        <span className="text-xs font-bold" style={{ color: 'var(--amber)' }}>View all</span>
+        <Link href="/shopping" className="text-xs font-bold" style={{ color: 'var(--amber)', textDecoration: 'none' }}>
+          View list
+        </Link>
       </div>
 
       {items.map((inv, i) => {
         const isCritical = inv.quantity === 0
         return (
-          <div key={inv.id}
+          <Link key={inv.id} href={`/inventory/${inv.items.id}`}
             className="flex items-center px-0.5 py-7px gap-9px"
-            style={{ borderBottom: i < items.length - 1 ? '1px solid var(--divider)' : 'none' }}>
+            style={{ borderBottom: i < items.length - 1 ? '1px solid var(--divider)' : 'none', textDecoration: 'none' }}>
             <span className="rounded-full shrink-0"
               style={{ width: 6, height: 6, background: isCritical ? '#EE1B49' : '#FFA070' }} />
             <span className="text-base leading-none">{inv.items.emoji ?? '📦'}</span>
@@ -65,7 +68,7 @@ export default function RunningLow({ items, totalLowCount }: Props) {
               style={{ color: isCritical ? '#C81440' : '#B85A2E' }}>
               {inv.quantity}
             </span>
-          </div>
+          </Link>
         )
       })}
     </div>
