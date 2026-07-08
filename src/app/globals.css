@@ -82,6 +82,37 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/*
+ * Input default/filled state.
+ * !important overrides inline border/background styles applied per-field.
+ */
+input,
+textarea,
+select {
+  border-radius: 12px !important;
+  border: 1px solid #FFF !important;
+  background: #FBF9F5 !important;
+}
+
+/*
+ * Input focus — glow only, border stays white.
+ */
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+select:focus,
+select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 4px 1px rgba(255, 211, 51, 0.50);
+  --tw-ring-shadow: none;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 /* Hide scrollbars on horizontal scroll containers */
 .no-scrollbar {
   scrollbar-width: none;

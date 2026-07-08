@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge'
 import { LOCATIONS } from '@/lib/constants'
 
 interface Props {
@@ -16,6 +15,46 @@ interface Props {
 
 function locationLabel(loc: string) {
   return LOCATIONS.find(l => l.value === loc)?.label ?? loc
+}
+
+// Exact specs from Figma node 31:109
+const LOW_BADGE: React.CSSProperties = {
+  background: '#FFE8DC',
+  border: '1px solid #FFA070',
+  borderRadius: 9,
+  padding: '4px 6px',
+  fontSize: 10,
+  fontWeight: 700,
+  color: '#9C3400',
+  lineHeight: '10px',
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
+}
+
+const OUT_BADGE: React.CSSProperties = {
+  background: '#FFE4EA',
+  border: '1px solid #EE1B49',
+  borderRadius: 9,
+  padding: '4px 6px',
+  fontSize: 10,
+  fontWeight: 700,
+  color: '#86001D',
+  lineHeight: '10px',
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
+}
+
+const LOCATION_BADGE: React.CSSProperties = {
+  background: 'var(--surface)',
+  border: '1px solid var(--divider)',
+  borderRadius: 9,
+  padding: '4px 6px',
+  fontSize: 9,
+  fontWeight: 500,
+  color: 'var(--muted)',
+  lineHeight: '10px',
+  whiteSpace: 'nowrap',
+  flexShrink: 0,
 }
 
 export default function InventoryItemRow({
@@ -55,34 +94,17 @@ export default function InventoryItemRow({
         </p>
       </div>
 
-      {/* Right side: qty + badges */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+      {/* Right side: badge (if any) + qty — all on one line */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+        {showMultiLocation && (
+          <span style={LOCATION_BADGE}>{locationSummary}</span>
+        )}
+        {isCritical && <span style={OUT_BADGE}>Out</span>}
+        {!isCritical && isLow && <span style={LOW_BADGE}>Low</span>}
         <span className="text-sm font-bold" style={{ color: 'var(--foreground)' }}>
           {totalQty} {unit}
         </span>
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          {showMultiLocation && (
-            <Badge
-              className="text-11"
-              style={{ background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--divider)', fontWeight: 500 }}
-            >
-              {locationSummary}
-            </Badge>
-          )}
-          {isCritical && (
-            <Badge className="text-11" style={{ background: '#EE1B49', color: '#fff', border: 'none' }}>
-              Out
-            </Badge>
-          )}
-          {!isCritical && isLow && (
-            <Badge className="text-11" style={{ background: '#FFA070', color: '#fff', border: 'none' }}>
-              Low
-            </Badge>
-          )}
-        </div>
       </div>
-
-      <i className="fi-rr-angle-right" style={{ fontSize: 14, color: 'var(--muted)', display: 'block', flexShrink: 0 }} />
     </button>
   )
 }

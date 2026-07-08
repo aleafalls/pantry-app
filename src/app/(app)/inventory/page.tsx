@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import LocationFilter from '@/components/inventory/LocationFilter'
 import InventoryItemRow from '@/components/inventory/InventoryItemRow'
 import { LOCATIONS } from '@/lib/constants'
-import Link from 'next/link'
+import AppBackground from '@/components/layout/AppBackground'
 
 interface AggregatedItem {
   itemId: string
@@ -109,7 +109,7 @@ export default function InventoryPage() {
     : null
 
   return (
-    <div style={{ minHeight: '100vh', paddingBottom: 112, background: 'var(--background)' }}>
+    <AppBackground>
 
       {/* Header */}
       <div style={{
@@ -121,12 +121,9 @@ export default function InventoryPage() {
         borderBottom: '1px solid oklch(100% 0 0 / 0.4)',
         display: 'flex', flexDirection: 'column', gap: 10,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Link href="/" style={{ color: 'var(--muted)', textDecoration: 'none', flexShrink: 0, lineHeight: 1 }} aria-label="Go back">
-            <i className="fi-rr-angle-left" style={{ fontSize: 18, display: 'block' }} />
-          </Link>
-          <h1 className="text-base font-extrabold" style={{ color: 'var(--foreground)' }}>Inventory</h1>
-        </div>
+        <h1 className="text-base font-extrabold text-center" style={{ color: 'var(--foreground)' }}>
+          Inventory
+        </h1>
 
         <Input
           type="text"
@@ -151,40 +148,99 @@ export default function InventoryPage() {
           <p className="text-sm" style={{ color: 'var(--muted)' }}>Loading…</p>
         </div>
       ) : filtered.length === 0 ? (
-        <div style={{ padding: '60px 20px', textAlign: 'center' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>📦</div>
+        <div style={{ padding: '40px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+          <div style={{ fontSize: 40 }}>📦</div>
           <p className="text-sm" style={{ color: 'var(--muted)' }}>
             {query ? `No items matching "${query}"` : 'No items in your pantry yet.'}
           </p>
+          {query.trim() && (
+            <a
+              href={`/add/new?name=${encodeURIComponent(query.trim())}`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 18px', borderRadius: 99,
+                background: 'var(--yellow-light)', border: '2px solid var(--yellow)',
+                color: '#4A3300', fontSize: 14, fontWeight: 700,
+                textDecoration: 'none',
+              }}
+            >
+              <span style={{ fontSize: 16 }}>+</span>
+              Add &ldquo;{query.trim()}&rdquo; to pantry
+            </a>
+          )}
         </div>
       ) : grouped ? (
         // Grouped by location
-        grouped.map(({ loc, items }) => (
-          <div key={loc.value}>
-            <div style={{ padding: '12px 20px 4px' }}>
-              <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
-                {loc.emoji} {loc.label}
-              </span>
+        <>
+          {grouped.map(({ loc, items }) => (
+            <div key={loc.value}>
+              <div style={{ padding: '12px 20px 4px' }}>
+                <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
+                  {loc.emoji} {loc.label}
+                </span>
+              </div>
+              {items.map(item => (
+                <InventoryItemRow
+                  key={item.itemId}
+                  {...item}
+                  onTap={() => router.push(`/inventory/${item.itemId}`)}
+                />
+              ))}
             </div>
-            {items.map(item => (
-              <InventoryItemRow
-                key={item.itemId}
-                {...item}
-                onTap={() => router.push(`/inventory/${item.itemId}`)}
-              />
-            ))}
-          </div>
-        ))
+          ))}
+          {query.trim() && (
+            <a
+              href={`/add/new?name=${encodeURIComponent(query.trim())}`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '13px 20px',
+                borderTop: '1px solid var(--divider)',
+                textDecoration: 'none',
+              }}
+            >
+              <span style={{
+                width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'var(--yellow-light)', fontSize: 14, fontWeight: 700, color: '#4A3300',
+              }}>+</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
+                Add &ldquo;{query.trim()}&rdquo; to pantry
+              </span>
+            </a>
+          )}
+        </>
       ) : (
         // Flat filtered list
-        filtered.map(item => (
-          <InventoryItemRow
-            key={item.itemId}
-            {...item}
-            onTap={() => router.push(`/inventory/${item.itemId}`)}
-          />
-        ))
+        <>
+          {filtered.map(item => (
+            <InventoryItemRow
+              key={item.itemId}
+              {...item}
+              onTap={() => router.push(`/inventory/${item.itemId}`)}
+            />
+          ))}
+          {query.trim() && (
+            <a
+              href={`/add/new?name=${encodeURIComponent(query.trim())}`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '13px 20px',
+                borderTop: '1px solid var(--divider)',
+                textDecoration: 'none',
+              }}
+            >
+              <span style={{
+                width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'var(--yellow-light)', fontSize: 14, fontWeight: 700, color: '#4A3300',
+              }}>+</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
+                Add &ldquo;{query.trim()}&rdquo; to pantry
+              </span>
+            </a>
+          )}
+        </>
       )}
-    </div>
+    </AppBackground>
   )
 }

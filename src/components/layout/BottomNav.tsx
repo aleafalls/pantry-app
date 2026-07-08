@@ -4,73 +4,68 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const tabs = [
-  { href: '/',          icon: 'fi-rr-home',          label: 'Home' },
-  { href: '/inventory', icon: 'fi-rr-box',            label: 'Inventory' },
-  { href: '/add',       icon: null,                   label: 'Add' },
-  { href: '/shopping',  icon: 'fi-rr-shopping-cart',  label: 'Shopping' },
-  { href: '/settings',  icon: 'fi-rr-settings',       label: 'Settings' },
+  { href: '/',          icon: 'fi-sr-home',                label: 'Home'      },
+  { href: '/inventory', icon: 'fi-sr-carrot',              label: 'Inventory' },
+  { href: '/add',       icon: null,                        label: null        }, // Add button
+  { href: '/shopping',  icon: 'fi-sr-shopping-cart-check', label: 'Shopping'  },
+  { href: '/chef',      icon: 'fi-sr-user-chef',           label: 'Chef'      },
 ]
 
 export default function BottomNav() {
   const pathname = usePathname()
 
+  function isActive(href: string) {
+    return href === '/' ? pathname === '/' : pathname.startsWith(href)
+  }
+
   return (
-    /*
-     * Fixed nav, centered inside the 660px column.
-     * left/right: max(20px, 50% - 330px + 20px) keeps 20px inset on mobile
-     * and clamps to the column edge on wider screens.
-     */
     <div
       className="fixed z-50"
       style={{
         bottom: 16,
         left:  'max(20px, calc(50% - 310px))',
         right: 'max(20px, calc(50% - 310px))',
-        overflow: 'visible',
       }}
     >
       <nav
-        className="flex items-center justify-around rounded-[28px]"
         style={{
-          paddingLeft: 22,
-          paddingRight: 22,
-          paddingTop: 12,
-          paddingBottom: 12,
-          background: 'oklch(100% 0 0 / 0.55)',
-          backdropFilter: 'blur(22px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(22px) saturate(180%)',
-          border: '1px solid oklch(100% 0 0 / 0.55)',
-          boxShadow: '0 1px 0 oklch(100% 0 0 / 0.7) inset, 0 10px 30px -10px oklch(30% 0.02 85 / 0.35)',
-          overflow: 'visible',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 7,
+          padding: 4,
+          borderRadius: 32,
+          background: 'rgba(255, 255, 255, 0.55)',
+          backdropFilter: 'blur(11px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(11px) saturate(180%)',
+          border: '1px solid rgba(255, 255, 255, 0.55)',
+          boxShadow: '0px 2px 25px 0px rgba(51, 48, 43, 0.12)',
         }}
       >
         {tabs.map(tab => {
-          const isActive = tab.href === '/'
-            ? pathname === '/'
-            : pathname.startsWith(tab.href)
-          const isAdd = tab.label === 'Add'
+          const active = isActive(tab.href)
+          const isAdd = tab.icon === null
 
           if (isAdd) {
             return (
               <Link
                 key={tab.href}
                 href={tab.href}
-                className="flex items-center justify-center rounded-full font-extrabold shrink-0"
-                style={{
-                  width: 46,
-                  height: 46,
-                  marginTop: -30,
-                  fontSize: 22,
-                  background: 'linear-gradient(150deg, #FFE680, #FFD333)',
-                  color: '#4A3300',
-                  border: '1px solid oklch(100% 0 0 / 0.7)',
-                  boxShadow: '0 1px 0 oklch(100% 0 0 / 0.8) inset, 0 8px 18px -4px oklch(70% 0.15 90 / 0.65)',
-                  position: 'relative',
-                  zIndex: 10,
-                }}
                 aria-label="Add item"
+                style={{
+                  width: 50,
+                  height: 48,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  borderRadius: '4px 23px 4px 23px',
+                  backgroundImage: 'linear-gradient(159.5deg, rgba(254,231,138,0.77) 8.63%, rgba(255,211,51,0.77) 90.66%)',
+                  border: '1px solid #FFE57C',
+                  boxShadow: '0px 1px 15px -3px rgba(255, 211, 51, 0.6)',
+                  textDecoration: 'none',
+                }}
               >
-                +
+                <i className="fi-sr-plus-small" style={{ fontSize: 22, display: 'block', lineHeight: 1, color: '#4A3300' }} />
               </Link>
             )
           }
@@ -79,14 +74,40 @@ export default function BottomNav() {
             <Link
               key={tab.href}
               href={tab.href}
-              className="flex items-center justify-center"
-              style={{ width: 40, height: 40, opacity: isActive ? 1 : 0.4 }}
-              aria-label={tab.label}
+              aria-label={tab.label ?? ''}
+              style={{
+                width: 66,
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 2,
+                padding: '8px 16px',
+                borderRadius: 28,
+                background: active ? '#EAE6DE' : 'transparent',
+                textDecoration: 'none',
+                transition: 'background 0.15s',
+              }}
             >
               <i
                 className={tab.icon!}
-                style={{ fontSize: 19, color: 'var(--foreground)', display: 'block' }}
+                style={{
+                  fontSize: 20,
+                  display: 'block',
+                  lineHeight: 1,
+                  color: '#33302B',
+                }}
               />
+              <span style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#33302B',
+                whiteSpace: 'nowrap',
+                lineHeight: 'normal',
+              }}>
+                {tab.label}
+              </span>
             </Link>
           )
         })}

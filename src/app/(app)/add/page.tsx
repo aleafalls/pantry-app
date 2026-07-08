@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import PageHeader from '@/components/layout/PageHeader'
+import AppBackground from '@/components/layout/AppBackground'
 
 interface HouseholdItem {
   id: string
@@ -88,7 +89,7 @@ export default function AddPage() {
   const showCreate = query.trim().length > 0
 
   return (
-    <div style={{ minHeight: '100vh', paddingBottom: 112, background: 'var(--background)', position: 'relative' }}>
+    <AppBackground>
 
       {/* Search header — custom layout to fit input alongside back arrow */}
       <div style={{
@@ -163,7 +164,7 @@ export default function AddPage() {
             {householdItems.map(item => (
               <button
                 key={item.id}
-                onClick={() => router.push(`/add/restock/${item.id}`)}
+                onClick={() => router.push(`/inventory/${item.id}`)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   width: '100%', padding: '12px 20px',
@@ -251,6 +252,6 @@ export default function AddPage() {
           </Link>
         )}
       </div>
-    </div>
+    </AppBackground>
   )
 }

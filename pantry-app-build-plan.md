@@ -575,44 +575,114 @@ When a user selects a catalog item for the first time:
 
 ---
 
-## Phase 9 — Shopping List
+## Phase 9 — Shopping List + Preferred Stores
 
-**Goal:** Implement the shared shopping list with auto-population, manual additions, check-off behavior, and live sync between household members.
-
----
-
-### 9.1 — Shopping List Screen
-
-1. 🤖 **Claude writes:** `src/app/(app)/shopping/page.tsx`:
-   - **Auto section:** Items where `quantity ≤ low_threshold` or `manual_low_flag = true`. Shows item, reason, and suggested quantity. "auto" badge.
-   - **Manual section:** Manually added items. Shows who added each ("Added by Erica").
-   - **Completed section:** Checked-off items with strikethrough. "Clear completed" button.
-   - Quick-add text input at the bottom for manual items.
+**Goal:** Implement the shared shopping list with auto-population, manual additions, check-off behavior, store-filtered views, and live sync between household members.
 
 ---
 
-### 9.2 — Check-Off Behavior
+### 9.0 — Preferred Stores (Supabase + Data Model)
 
-1. 🤖 **Claude writes:** The check-off interaction:
-   - Tapping a checkbox: marks `status: purchased`, moves item to Completed section.
-   - Prompt appears: "Restock this item now?" — Yes routes to Restock Form; No dismisses.
-   - "Clear completed" sets `status: cleared` on all completed rows.
+**New database objects (user runs in Supabase SQL Editor):**
+
+```sql
+-- Stores table — household-scoped list of regular stores
+create table public.stores (
+  id uuid primary key default uuid_generate_v4(),
+  household_id uuid not null references public.households(id),
+  name text not null,
+  created_at timestamptz default now()
+);
+alter table public.stores enable row level security;
+create policy "Stores readable by household" on public.stores for select to authenticated using (household_id = public.get_my_household_id());
+create policy "Stores insertable by household" on public.stores for insert to authenticated with check (household_id = public.get_my_household_id());
+create policy "Stores deletable by household" on public.stores for delete to authenticated using (household_id = public.get_my_household_id());
+
+-- Add preferred_stores column to items
+alter table public.items add column if not exists preferred_stores text[] default '{}';
+```
+
+Also add the `stores` table to the Supabase Realtime replication.
 
 ---
 
-### 9.3 — Auto-Population Trigger
+### 9.1 — MultiSelect DrawerSelect Component
 
-Shopping list auto-population happens server-side when inventory changes.
+Extend `src/components/ui/DrawerSelect.tsx` to support multi-select mode and inline item creation.
 
-1. 🤖 **Claude writes:** A Supabase database trigger (SQL) on the `inventory` table that fires after every INSERT or UPDATE. If the new quantity is ≤ the item's `low_threshold` and no pending row already exists in `shopping_list`, it inserts a new auto row.
+**New props:**
+- `multiple?: boolean` — enables multi-select (pills toggle on/off, drawer stays open)
+- `values?: string[]` — controlled selected values array (replaces `value` in multi mode)
+- `onChangeMultiple?: (values: string[]) => void`
+- `onAddNew?: (name: string) => void` — shows inline text input for creating a new option
+
+**Behaviour in multi-select mode:**
+- Tapping a pill toggles it on/off; drawer does NOT close
+- All selected pills show yellow-light fill + yellow border
+- "Add a store" input field pinned at the bottom (above search if both present)
+- Typing a name and pressing Enter/tapping Add saves the new option via `onAddNew` and immediately selects it
 
 ---
 
-### 9.4 — Realtime Sync
+### 9.2 — Preferred Stores on Item Detail
 
-1. 🤖 **Claude writes:** A Supabase Realtime subscription in the shopping list component so both household members see changes instantly without refreshing.
+Add a "Preferred stores" row to the Edit Item Details accordion in `src/app/(app)/inventory/[itemId]/ItemDetail.tsx`.
 
-✅ **Verify:** Open the shopping list on two devices (phone + laptop). Check off an item on one — it updates immediately on the other.
+- Uses the multi-select `DrawerSelect` with stores from the household
+- `onAddNew` saves a new store row to the `stores` table and adds it to `preferred_stores` on the item
+- Saves `preferred_stores` array to `items` table on change
+
+---
+
+### 9.3 — Shopping List Screen
+
+`src/app/(app)/shopping/page.tsx` — client component:
+
+**Store filter pills** (All + household stores) at the top, same pill pattern as inventory location filter.
+
+When a store is selected:
+- Auto-added items: show only those where the item has that store in `preferred_stores`
+- Manually added items: show only those tagged with that store (store saved on the `shopping_list` row)
+- Items with no preferred stores only appear in "All"
+
+When "All" is selected: show everything.
+
+**Three sections:**
+
+1. **Needs buying** (auto-added by DB trigger) — item emoji, name, "auto" badge, suggested qty
+2. **Added manually** — free-text items added by user, "Added by [name]" attribution
+3. **Completed** — checked-off items, strikethrough styling, "Clear completed" button
+
+**Quick-add input** pinned at bottom — free-text entry. If a store filter is active, the new manual item is tagged to that store automatically.
+
+---
+
+### 9.4 — Check-Off Behavior
+
+- Tapping an item's checkbox marks `status: purchased`, moves to Completed section
+- Prompt: "Update stock now?" — Yes routes to `/inventory/[itemId]`; No dismisses
+- "Clear completed" sets `status: cleared` on all purchased rows
+- Completing an item that has `preferred_stores` removes it from all store views (same underlying entry)
+
+---
+
+### 9.5 — Auto-Population Trigger
+
+Already built in Phase 1. Fires on every `inventory` INSERT/UPDATE. No additional work needed.
+
+---
+
+### 9.6 — Realtime Sync
+
+Supabase Realtime subscription on `shopping_list` table already enabled in Phase 1. Wire up the subscription in the shopping list component so changes from either household member appear without refresh.
+
+✅ **Verify:**
+1. Item goes below threshold → appears on shopping list automatically
+2. Select "Costco" filter → only Costco-preferred items shown
+3. Add Greek yogurt with stores: Costco + Aldi → appears on both filtered views
+4. Restock from either list → disappears from both store filters
+5. Add manual item while on Costco filter → item tagged Costco
+6. Check off item on one device → updates on other device in real time
 
 ---
 

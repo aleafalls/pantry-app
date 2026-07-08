@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/layout/PageHeader'
+import AppBackground from '@/components/layout/AppBackground'
 import { Button } from '@/components/ui/button'
 import QuantityStepper from '@/components/add/QuantityStepper'
 import LocationSelector from '@/components/add/LocationSelector'
-import SuccessScreen from '@/components/add/SuccessScreen'
 
 interface CatalogItem {
   id: string
@@ -25,11 +26,11 @@ interface Props {
 }
 
 export default function CatalogRestockForm({ catalogItem, householdId, userId }: Props) {
+  const router = useRouter()
   const [addedQty, setAddedQty] = useState(1)
   const [location, setLocation] = useState(catalogItem.default_location)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -70,23 +71,12 @@ export default function CatalogRestockForm({ catalogItem, householdId, userId }:
 
     if (invError) { setError(invError.message); setLoading(false); return }
 
-    setSuccess(true)
-    setLoading(false)
-  }
-
-  if (success) {
-    return (
-      <div style={{ minHeight: '100vh', background: 'var(--background)', paddingBottom: 112 }}>
-        <SuccessScreen
-          itemName={catalogItem.name}
-          detail={`${addedQty} ${catalogItem.default_unit} added to ${location}`}
-        />
-      </div>
-    )
+    // Route to the unified inventory detail page for the new item
+    router.push(`/inventory/${itemId}`)
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--background)', paddingBottom: 112 }}>
+    <AppBackground>
 
       <PageHeader title="Add to pantry" backHref="/add" />
 
@@ -123,6 +113,6 @@ export default function CatalogRestockForm({ catalogItem, householdId, userId }:
           {loading ? 'Adding…' : 'Add to pantry'}
         </Button>
       </form>
-    </div>
+    </AppBackground>
   )
 }

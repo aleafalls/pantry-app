@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/layout/PageHeader'
+import AppBackground from '@/components/layout/AppBackground'
 import { Button } from '@/components/ui/button'
 import QuantityStepper from '@/components/add/QuantityStepper'
 import LocationSelector from '@/components/add/LocationSelector'
@@ -96,17 +97,17 @@ export default function RestockForm({ item, inventoryRows, userId }: Props) {
 
   if (success) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--background)', paddingBottom: 112 }}>
+      <AppBackground>
         <SuccessScreen
           itemName={item.name}
           detail={`You now have ${newTotal} ${unit} total`}
         />
-      </div>
+      </AppBackground>
     )
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--background)', paddingBottom: 112 }}>
+    <AppBackground>
 
       <PageHeader title="Restock" backHref="/add" />
 
@@ -162,6 +163,6 @@ export default function RestockForm({ item, inventoryRows, userId }: Props) {
           {loading ? 'Adding…' : 'Add to pantry'}
         </Button>
       </form>
-    </div>
+    </AppBackground>
   )
 }

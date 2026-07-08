@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 
 const AVATAR_COLORS = [
   { bg: '#FFD333', text: '#4A3300' },
@@ -31,7 +32,6 @@ export default function DashboardHeader({ householdName, members }: Props) {
         position: 'sticky',
         top: 0,
         zIndex: 10,
-        // Exact design spec: padding 24px 20px 14px
         padding: '24px 20px 14px',
         display: 'flex',
         flexDirection: 'column',
@@ -43,11 +43,10 @@ export default function DashboardHeader({ householdName, members }: Props) {
         boxShadow: '0 1px 0 oklch(100% 0 0 / 0.6) inset',
       }}
     >
-      {/* Top row: greeting + name + avatars */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <span style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 500 }}>
-            {greeting || ' '}
+            {greeting || ' '}
           </span>
           <span style={{
             fontSize: 22,
@@ -60,14 +59,13 @@ export default function DashboardHeader({ householdName, members }: Props) {
           </span>
         </div>
 
-        {/* Avatar stack */}
+        {/* Avatar stack — tapping the first avatar navigates to Settings */}
         <div style={{ display: 'flex', marginLeft: 8 }}>
           {members.slice(0, 4).map((member, i) => {
             const colors = AVATAR_COLORS[i % AVATAR_COLORS.length]
             const initial = member.display_name?.[0]?.toUpperCase() ?? '?'
-            return (
+            const avatar = (
               <div
-                key={i}
                 style={{
                   width: 34,
                   height: 34,
@@ -84,10 +82,18 @@ export default function DashboardHeader({ householdName, members }: Props) {
                   position: 'relative',
                   zIndex: members.length - i,
                   flexShrink: 0,
+                  cursor: i === 0 ? 'pointer' : 'default',
                 }}
               >
                 {initial}
               </div>
+            )
+            return i === 0 ? (
+              <Link key={i} href="/settings" style={{ textDecoration: 'none' }} aria-label="Settings">
+                {avatar}
+              </Link>
+            ) : (
+              <div key={i}>{avatar}</div>
             )
           })}
         </div>

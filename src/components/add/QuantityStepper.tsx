@@ -7,9 +7,12 @@ interface Props {
   label?: string
 }
 
+const FILL = 'lab(99 0.1 1.08)'
+const BORDER = '1px solid oklch(100% 0 0 / 0.5)'
+
 export default function QuantityStepper({ value, onChange, min = 1, label }: Props) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
       {label && (
         <span className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
           {label}
@@ -24,8 +27,8 @@ export default function QuantityStepper({ value, onChange, min = 1, label }: Pro
             borderRadius: '12px 0 0 12px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 20, fontWeight: 600,
-            background: 'var(--surface)',
-            border: '1px solid var(--divider)',
+            background: FILL,
+            border: BORDER,
             color: 'var(--foreground)',
             cursor: value <= min ? 'not-allowed' : 'pointer',
             opacity: value <= min ? 0.4 : 1,
@@ -37,9 +40,9 @@ export default function QuantityStepper({ value, onChange, min = 1, label }: Pro
           flex: 1, height: 44, minWidth: 64,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 17, fontWeight: 800,
-          background: 'var(--surface)',
-          borderTop: '1px solid var(--divider)',
-          borderBottom: '1px solid var(--divider)',
+          background: FILL,
+          borderTop: BORDER,
+          borderBottom: BORDER,
           color: 'var(--foreground)',
         }}>
           {value}
@@ -52,8 +55,8 @@ export default function QuantityStepper({ value, onChange, min = 1, label }: Pro
             borderRadius: '0 12px 12px 0',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 20, fontWeight: 600,
-            background: 'var(--surface)',
-            border: '1px solid var(--divider)',
+            background: FILL,
+            border: BORDER,
             color: 'var(--foreground)',
             cursor: 'pointer',
           }}
