@@ -114,7 +114,11 @@ export default function AddPage() {
       const res = await fetch(`/api/barcode/${encodeURIComponent(barcode)}`)
       const data = await res.json()
       const params = new URLSearchParams({ barcode })
-      if (data.found && data.name) params.set('name', data.name)
+      // Prefer the category-derived generic name ("Coffee beans") over the
+      // brand-specific product name ("Holler Mt") — falls back to whichever
+      // one is actually available.
+      const prefillName = data.found && (data.genericName || data.name)
+      if (prefillName) params.set('name', prefillName)
       if (data.found && data.category) params.set('category', data.category)
       router.push(`/add/new?${params.toString()}`)
     } catch {

@@ -25,9 +25,22 @@ function guessCategory(text: string): string | null {
   return null
 }
 
+// Open Food Facts' own `generic_name` field is almost never filled in by
+// contributors. Its `categories_tags` hierarchy (broad → specific) is far
+// more reliable — the last tag is usually the most specific one, e.g.
+// "en:cherry-tomatoes" or "en:coffee-beans" rather than a brand name.
+function genericNameFromCategories(categoriesTags: string[] | undefined): string | null {
+  const last = categoriesTags?.at(-1)
+  if (!last) return null
+  const humanized = last.replace(/^[a-z]{2}:/, '').replace(/-/g, ' ').trim()
+  return humanized || null
+}
+
 interface OpenFoodFactsProduct {
   product_name?: string
   product_name_en?: string
+  generic_name?: string
+  generic_name_en?: string
   categories?: string
   categories_tags?: string[]
 }
@@ -63,9 +76,15 @@ export async function GET(
 
   const categoryText = [product.categories, ...(product.categories_tags ?? [])].filter(Boolean).join(' ')
 
+  // Prefer OFF's own generic_name if a contributor happened to fill it in
+  // (rare in practice), otherwise derive one from the category hierarchy.
+  const genericName = product.generic_name || product.generic_name_en
+    || genericNameFromCategories(product.categories_tags)
+
   return NextResponse.json({
     found: true,
     name,
+    genericName,
     category: guessCategory(categoryText),
   })
 }
