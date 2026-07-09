@@ -10,6 +10,7 @@ export const CATEGORIES = [
   'Produce',
   'Meat & Seafood',
   'Spices & Seasonings',
+  'Pet Supplies',
   'Household & Other',
 ]
 
@@ -21,10 +22,12 @@ export const UNITS_GROUPED: Record<string, string[]> = {
 }
 
 export const LOCATIONS = [
-  { value: 'pantry',     label: 'Pantry',     emoji: '🥫' },
-  { value: 'fridge',     label: 'Fridge',     emoji: '🧊' },
-  { value: 'freezer',    label: 'Freezer',    emoji: '❄️' },
-  { value: 'spice_rack', label: 'Spice Rack', emoji: '🧂' },
+  { value: 'pantry',            label: 'Pantry',            emoji: '🥫' },
+  { value: 'fridge',            label: 'Fridge',            emoji: '🧊' },
+  { value: 'freezer',           label: 'Freezer',           emoji: '❄️' },
+  { value: 'spice_rack',        label: 'Spice Rack',        emoji: '🧂' },
+  { value: 'cleaning_supplies', label: 'Cleaning Supplies', emoji: '🧽' },
+  { value: 'garage_overflow',   label: 'Garage / Overflow', emoji: '🧰' },
 ]
 
 export const US_STATES = [

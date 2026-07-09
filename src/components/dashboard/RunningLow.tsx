@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
+import { LOCATIONS } from '@/lib/constants'
 
 interface InventoryRow {
   id: string
@@ -12,9 +13,7 @@ interface Props {
   totalLowCount: number
 }
 
-const LOCATION_LABELS: Record<string, string> = {
-  pantry: 'Pantry', fridge: 'Fridge', freezer: 'Freezer', spice_rack: 'Spice rack',
-}
+const LOCATION_LABELS: Record<string, string> = Object.fromEntries(LOCATIONS.map(l => [l.value, l.label]))
 
 export default function RunningLow({ items, totalLowCount }: Props) {
   if (items.length === 0) {

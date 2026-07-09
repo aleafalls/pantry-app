@@ -29,6 +29,11 @@ interface Household {
   state: string | null
   default_servings: number
   owner_id: string | null
+  shopping_tier: number
+}
+
+const SHOPPING_TIER_LABELS: Record<number, string> = {
+  1: 'Budget', 3: 'Standard', 5: 'Premium',
 }
 
 interface Member {
@@ -52,6 +57,7 @@ export default function SettingsClient({ userId, displayName, avatarEmoji, house
   const [city, setCity] = useState(household.city ?? '')
   const [state, setState] = useState(household.state ?? '')
   const [servings, setServings] = useState(household.default_servings)
+  const [shoppingTier, setShoppingTier] = useState(household.shopping_tier)
   const [yourName, setYourName] = useState(displayName)
   const [emoji, setEmoji] = useState(avatarEmoji)
   const [copiedLink, setCopiedLink] = useState(false)
@@ -87,6 +93,11 @@ export default function SettingsClient({ userId, displayName, avatarEmoji, house
     setServings(val)
     const supabase = createClient()
     await supabase.from('households').update({ default_servings: val }).eq('id', household.id)
+  }
+
+  async function saveShoppingTier() {
+    const supabase = createClient()
+    await supabase.from('households').update({ shopping_tier: shoppingTier }).eq('id', household.id)
   }
 
   async function saveYourName() {
@@ -208,6 +219,31 @@ export default function SettingsClient({ userId, displayName, avatarEmoji, house
           <Label>Default servings</Label>,
           <QuantityStepper value={servings} onChange={saveServings} min={1} />
         )}
+
+        <div>
+          <Label style={{ display: 'block', marginBottom: 8 }}>Shopping style</Label>
+          <input
+            type="range"
+            min={1}
+            max={5}
+            step={1}
+            value={shoppingTier}
+            onChange={e => setShoppingTier(Number(e.target.value))}
+            onMouseUp={saveShoppingTier}
+            onTouchEnd={saveShoppingTier}
+            onBlur={saveShoppingTier}
+            style={{ width: '100%', accentColor: 'var(--yellow)' }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+            <span className="text-11" style={{ color: 'var(--muted)' }}>{SHOPPING_TIER_LABELS[1]}</span>
+            <span className="text-11" style={{ color: 'var(--muted)' }}>{SHOPPING_TIER_LABELS[3]}</span>
+            <span className="text-11" style={{ color: 'var(--muted)' }}>{SHOPPING_TIER_LABELS[5]}</span>
+          </div>
+        </div>
+
+        <p className="text-11" style={{ color: 'var(--muted)', marginTop: -8 }}>
+          Helps AI estimate more accurate prices based on where you typically shop.
+        </p>
 
         {/* ── Members ── */}
         {sectionLabel('Members')}

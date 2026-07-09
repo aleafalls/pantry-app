@@ -14,6 +14,7 @@ import QuantityStepper from '@/components/add/QuantityStepper'
 import TagInput from '@/components/add/TagInput'
 import SuccessScreen from '@/components/add/SuccessScreen'
 import { CATEGORIES, UNITS_GROUPED, LOCATIONS } from '@/lib/constants'
+import { getOrFetchEnrichment, refetchEnrichment, type EnrichmentResult } from '@/lib/enrichment'
 
 function NewItemForm() {
   const searchParams = useSearchParams()
@@ -41,6 +42,13 @@ function NewItemForm() {
   const [preferredStores, setPreferredStores] = useState<string[]>([])
   const [householdStores, setHouseholdStores] = useState<string[]>([])
   const [tags, setTags] = useState<string[]>([])
+  const [estimatedPrice, setEstimatedPrice] = useState<number | null>(null)
+
+  // ── AI enrichment ─────────────────────────────────────────
+  const [enriching, setEnriching] = useState(false)
+  const [householdCity, setHouseholdCity] = useState<string | null>(null)
+  const [householdState, setHouseholdState] = useState<string | null>(null)
+  const [shoppingTier, setShoppingTier] = useState<number | null>(null)
 
   // ── Meta ──────────────────────────────────────────────────
   const [loading, setLoading] = useState(false)
@@ -49,20 +57,72 @@ function NewItemForm() {
   const [householdId, setHouseholdId] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
 
+  // Only fills a field if it's still at its default/empty value — never
+  // overwrites something the user (or an earlier enrichment pass) already set.
+  function applyEnrichment(result: EnrichmentResult) {
+    if (result.category) setCategory(prev => prev === '' ? result.category! : prev)
+    if (result.unit) setUnit(prev => prev === 'each' ? result.unit! : prev)
+    if (result.location) setLocation(prev => prev === 'pantry' ? result.location! : prev)
+    if (result.emoji) setEmoji(prev => prev === '📦' ? result.emoji : prev)
+    setEstimatedPrice(result.estimated_price)
+  }
+
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
       setUserId(user.id)
-      supabase.from('profiles').select('household_id').eq('id', user.id).single()
+      supabase.from('profiles')
+        .select('household_id, households(city, state, shopping_tier)')
+        .eq('id', user.id).single()
         .then(({ data: profile }) => {
           if (!profile?.household_id) return
           setHouseholdId(profile.household_id)
           supabase.from('stores').select('name').eq('household_id', profile.household_id).order('name')
             .then(({ data }) => setHouseholdStores((data ?? []).map(s => s.name)))
+
+          const household = profile.households as unknown as { city: string | null; state: string | null; shopping_tier: number } | null
+          setHouseholdCity(household?.city ?? null)
+          setHouseholdState(household?.state ?? null)
+          setShoppingTier(household?.shopping_tier ?? null)
+
+          // Arrived with a name already resolved (barcode scan, or typed +
+          // tapped "Create" on the Add page) — enrich automatically. Picks
+          // up the prewarmed request from the shared cache if one exists.
+          const initialName = searchParams.get('name')
+          if (initialName?.trim()) {
+            setEnriching(true)
+            getOrFetchEnrichment({
+              name: initialName,
+              city: household?.city ?? null,
+              state: household?.state ?? null,
+              shoppingTier: household?.shopping_tier ?? null,
+            }).then(result => {
+              if (result) applyEnrichment(result)
+              setEnriching(false)
+            })
+          }
         })
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once on mount only
   }, [])
+
+  function handleAutofillTap() {
+    if (!name.trim() || enriching) return
+    setEnriching(true)
+    refetchEnrichment({
+      name: name.trim(),
+      category,
+      unit,
+      location,
+      city: householdCity,
+      state: householdState,
+      shoppingTier,
+    }).then(result => {
+      if (result) applyEnrichment(result)
+      setEnriching(false)
+    })
+  }
 
   async function addNewStore(storeName: string) {
     const supabase = createClient()
@@ -96,6 +156,7 @@ function NewItemForm() {
       preferred_stores: preferredStores,
       auto_shopping_list: autoShoppingList,
       barcode: barcode || null,
+      estimated_price: estimatedPrice,
       active: true,
     })
 
@@ -154,19 +215,42 @@ function NewItemForm() {
 
       <form onSubmit={handleSubmit} style={{ padding: '20px 20px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        {/* ── Name + emoji (same row as Inventory Detail identity) ── */}
+        {/* ── Name + AI autofill + emoji (same row as Inventory Detail identity) ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-          <Input
-            type="text"
-            required
-            autoFocus
-            placeholder="Item name"
-            value={name}
-            autoCapitalize="words"
-            onChange={e => setName(toTitleCase(e.target.value))}
-            className="font-extrabold text-lg flex-1"
-            style={{ color: 'var(--foreground)' }}
-          />
+          <div style={{ position: 'relative', flex: 1 }}>
+            <Input
+              type="text"
+              required
+              autoFocus
+              placeholder="Item name"
+              value={name}
+              autoCapitalize="words"
+              onChange={e => setName(toTitleCase(e.target.value))}
+              className="font-extrabold text-lg"
+              style={{ color: 'var(--foreground)', paddingRight: 40 }}
+            />
+            <button
+              type="button"
+              onClick={handleAutofillTap}
+              disabled={!name.trim() || enriching}
+              aria-label="Autofill with AI"
+              style={{
+                position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                background: 'none', border: 'none', padding: 0,
+                cursor: !name.trim() || enriching ? 'default' : 'pointer',
+                opacity: !name.trim() ? 0.3 : 1,
+                color: 'var(--amber)',
+              }}
+            >
+              <i
+                className={enriching ? 'fi-sr-sparkles' : 'fi-rr-sparkles'}
+                style={{
+                  fontSize: 18, display: 'block', lineHeight: 1,
+                  animation: enriching ? 'spin 1s linear infinite' : 'none',
+                }}
+              />
+            </button>
+          </div>
           <EmojiPicker value={emoji} onChange={setEmoji} />
         </div>
 

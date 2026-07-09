@@ -8,10 +8,9 @@ import { Button } from '@/components/ui/button'
 import QuantityStepper from '@/components/add/QuantityStepper'
 import LocationSelector from '@/components/add/LocationSelector'
 import SuccessScreen from '@/components/add/SuccessScreen'
+import { LOCATIONS } from '@/lib/constants'
 
-const LOCATION_LABELS: Record<string, string> = {
-  pantry: 'Pantry', fridge: 'Fridge', freezer: 'Freezer', spice_rack: 'Spice Rack',
-}
+const LOCATION_LABELS: Record<string, string> = Object.fromEntries(LOCATIONS.map(l => [l.value, l.label]))
 
 interface InventoryRow {
   id: string

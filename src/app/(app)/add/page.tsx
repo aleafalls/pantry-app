@@ -9,6 +9,7 @@ import Link from 'next/link'
 import PageHeader from '@/components/layout/PageHeader'
 import AppBackground from '@/components/layout/AppBackground'
 import BarcodeScanner from '@/components/add/BarcodeScanner'
+import { prewarmEnrichment } from '@/lib/enrichment'
 
 interface HouseholdItem {
   id: string
@@ -35,17 +36,28 @@ export default function AddPage() {
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([])
   const [loading, setLoading] = useState(false)
   const [householdId, setHouseholdId] = useState<string | null>(null)
+  const [householdCity, setHouseholdCity] = useState<string | null>(null)
+  const [householdState, setHouseholdState] = useState<string | null>(null)
+  const [shoppingTier, setShoppingTier] = useState<number | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [scanLookupLoading, setScanLookupLoading] = useState(false)
 
-  // Load household id on mount + auto-focus
+  // Load household id + location/shopping-tier (for enrichment context) on mount, + auto-focus
   useEffect(() => {
     inputRef.current?.focus()
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return
-      supabase.from('profiles').select('household_id').eq('id', user.id).single()
-        .then(({ data }) => setHouseholdId(data?.household_id ?? null))
+      supabase.from('profiles')
+        .select('household_id, households(city, state, shopping_tier)')
+        .eq('id', user.id).single()
+        .then(({ data }) => {
+          setHouseholdId(data?.household_id ?? null)
+          const household = data?.households as unknown as { city: string | null; state: string | null; shopping_tier: number } | null
+          setHouseholdCity(household?.city ?? null)
+          setHouseholdState(household?.state ?? null)
+          setShoppingTier(household?.shopping_tier ?? null)
+        })
     })
   }, [])
 
@@ -287,6 +299,17 @@ export default function AddPage() {
         {showCreate && (
           <Link
             href={`/add/new?name=${encodeURIComponent(query.trim())}`}
+            onClick={() => {
+              // Fire enrichment now so it has a head start before the New
+              // Item form mounts — the form picks up this same in-flight
+              // request from the shared cache instead of starting fresh.
+              prewarmEnrichment({
+                name: query.trim(),
+                city: householdCity,
+                state: householdState,
+                shoppingTier,
+              })
+            }}
             style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '14px 20px',

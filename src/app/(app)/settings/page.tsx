@@ -10,7 +10,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('display_name, avatar_emoji, household_id, households(id, name, invite_code, city, state, default_servings, owner_id)')
+    .select('display_name, avatar_emoji, household_id, households(id, name, invite_code, city, state, default_servings, owner_id, shopping_tier)')
     .eq('id', user.id)
     .single()
 
@@ -24,6 +24,7 @@ export default async function SettingsPage() {
     state: string | null
     default_servings: number
     owner_id: string | null
+    shopping_tier: number
   }
 
   const { data: members } = await supabase

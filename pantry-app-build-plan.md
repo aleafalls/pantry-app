@@ -800,7 +800,9 @@ iOS doesn't auto-prompt users to install a PWA. We need a manual nudge.
 
 ## Phase 13 — AI Features *(Phase 2)*
 
-**Goal:** Add AI emoji assignment and pantry value estimation via the Claude API.
+**Goal:** Add AI item enrichment (category, unit, emoji, price) via the Claude API, triggered while the user is filling out the New Item form rather than after they've already saved it.
+
+Full prompt spec (trigger points, input/output schema, exact prompt text): [`ai-prompts/item-enrichment.md`](../ai-prompts/item-enrichment.md).
 
 ---
 
@@ -815,30 +817,55 @@ iOS doesn't auto-prompt users to install a PWA. We need a manual nudge.
 
 ---
 
-### 13.2 — AI Emoji Assignment
+### 13.2 — Shopping Tier & Item Enrichment Data Model
 
-1. 🤖 **Claude writes:** `src/app/api/ai/emoji/route.ts` — takes item name and category, returns a single emoji from the Claude API.
-2. 🤖 **Claude writes:** The async call that fires after a new item is saved — writes the returned emoji back to the `items` table.
-3. 🤖 **Claude writes:** Placeholder state in the UI (neutral icon) while the emoji is being assigned.
+**New columns (user runs in Supabase SQL Editor):**
 
----
+```sql
+alter table public.households
+  add column if not exists shopping_tier int not null default 3;
 
-### 13.3 — AI Pantry Value Estimate
+alter table public.items
+  add column if not exists estimated_price numeric;
+```
 
-Uses the household location captured in Settings (Phase 10.1) as regional price context — no separate location field needed here.
-
-1. 🤖 **Claude writes:** `src/app/api/ai/price/route.ts` — takes item name, category, unit, and location, returns an estimated price per unit.
-2. 🤖 **Claude writes:** The trigger that calls this API after a new item is saved, storing the result in `items.estimated_price`.
-3. 🤖 **Claude writes:** The **Est. value** stat card on the dashboard, now showing the summed estimate.
-4. 🤖 **Claude writes:** A "Refresh estimates" button in Settings that re-runs price estimation for all items.
+`shopping_tier` is 1–5 (Budget → Premium, see the prompt doc for the full mapping); default `3` (Standard) until the household sets it in Settings.
 
 ---
 
-### 13.4 — Batch Emoji Enrichment
+### 13.3 — Shopping Tier Slider (Settings)
 
-For items added before AI emoji was available.
+1. 🤖 **Claude writes:** A slider control in Settings, next to household location — `<input type="range" min="1" max="5">` labeled at 1/3/5 (Budget / Standard / Premium), positions 2 and 4 selectable as unlabeled in-between stops. Saves to `households.shopping_tier`.
 
-1. 🤖 **Claude writes:** A "Enrich all items" action in Settings that batch-assigns emojis to any items with no emoji set. Runs sequentially with a progress indicator.
+---
+
+### 13.4 — Item Enrichment Endpoint
+
+1. 🤖 **Claude writes:** `src/app/api/ai/enrich-item/route.ts` — takes name, category, unit, city/state, and shopping tier; returns `{ category, unit, emoji, estimated_price }` via a Zod-validated structured output (`claude-haiku-4-5`, no thinking/effort). Exact schema and prompt text in [`ai-prompts/item-enrichment.md`](../ai-prompts/item-enrichment.md).
+
+---
+
+### 13.5 — Wire Into the New Item Form
+
+1. 🤖 **Claude writes:** A mount-effect that auto-fires enrichment when the form was reached via a resolved barcode name (background call, doesn't block the form from rendering).
+2. 🤖 **Claude writes:** An "Autofill" button near the name field for the manual-entry path — disabled until a name is entered, calls the same enrichment function on tap.
+3. 🤖 **Claude writes:** The fill logic — only overwrite `category`/`unit`/`emoji` if each is still at its default/empty value; always apply `estimated_price`.
+
+✅ **Verify:** Scan a barcode for an item not in your household — by the time you're done adjusting quantity/location, emoji and price have already filled in. Manually add a new item, type a name, tap Autofill — category, unit, emoji, and price populate without overwriting anything you'd already set yourself.
+
+---
+
+### 13.6 — Est. Value Stat Card
+
+1. 🤖 **Claude writes:** The **Est. value** stat card on the dashboard (reserved slot from Phase 6.2) — sums `quantity × estimated_price` across all inventory rows.
+
+---
+
+### 13.7 — Batch Enrichment
+
+For items added before AI enrichment existed.
+
+1. 🤖 **Claude writes:** An "Enrich all items" action in Settings that runs enrichment for any item missing `estimated_price`. Runs sequentially with a progress indicator.
 
 ---
 
