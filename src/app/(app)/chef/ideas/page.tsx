@@ -3,12 +3,14 @@ import { redirect } from 'next/navigation'
 import AppBackground from '@/components/layout/AppBackground'
 import PageHeader from '@/components/layout/PageHeader'
 import ChefTabs from '@/components/chef/ChefTabs'
-import RecipeIdeasPreview from '@/components/chef/RecipeIdeasPreview'
-import SavedRecipesPreview from '@/components/chef/SavedRecipesPreview'
 import { getChefContext } from '@/lib/chefData'
-import ChefSuggestions from './ChefSuggestions'
+import IdeasResults from './IdeasResults'
 
-export default async function ChefPage() {
+interface Props {
+  searchParams: Promise<{ q?: string }>
+}
+
+export default async function ChefIdeasPage({ searchParams }: Props) {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -22,21 +24,20 @@ export default async function ChefPage() {
 
   if (!profile?.household_id) redirect('/onboarding')
 
+  const { q } = await searchParams
   const context = await getChefContext(supabase, profile.household_id)
 
   return (
     <AppBackground>
-      <PageHeader title="Chef">
+      <PageHeader title="Recipe Ideas" backHref="/chef">
         <ChefTabs />
       </PageHeader>
-      <div className="flex flex-col gap-6" style={{ padding: '20px 20px 0' }}>
-        <ChefSuggestions
+      <div style={{ padding: '20px 20px 0' }}>
+        <IdeasResults
           inventory={context.inventory}
-          priorityItems={context.priorityItems}
           defaultServings={context.defaultServings}
+          query={q}
         />
-        <RecipeIdeasPreview />
-        <SavedRecipesPreview />
       </div>
     </AppBackground>
   )

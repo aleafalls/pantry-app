@@ -61,7 +61,7 @@ export default function QuantityStepper({ value, onChange, min = 1, label }: Pro
             cursor: 'pointer',
           }}
         >
-          +
+          <i className="fi-rr-plus" style={{ fontSize: 15, display: 'block', lineHeight: 1 }} />
         </button>
       </div>
     </div>

@@ -67,7 +67,10 @@ export default function ShoppingPage() {
 
   // Debounced inventory search
   useEffect(() => {
-    if (!searchQuery.trim() || !householdId) { setSearchResults([]); return }
+    if (!searchQuery.trim() || !householdId) {
+      const clear = setTimeout(() => setSearchResults([]), 0)
+      return () => clearTimeout(clear)
+    }
     const timer = setTimeout(async () => {
       const supabase = createClient()
       const { data } = await supabase
@@ -123,7 +126,13 @@ export default function ShoppingPage() {
     if (inventory) {
       // Aggregate quantities per item
       const itemMap = new Map<string, { name: string; total: number; threshold: number; manualLow: boolean }>()
-      for (const row of inventory as any[]) {
+      const inventoryRows = inventory as unknown as {
+        item_id: string
+        quantity: number
+        manual_low_flag: boolean
+        items: { id: string; name: string; low_threshold: number; active: boolean }
+      }[]
+      for (const row of inventoryRows) {
         const ex = itemMap.get(row.item_id)
         if (ex) {
           ex.total += row.quantity
@@ -145,7 +154,7 @@ export default function ShoppingPage() {
         .eq('household_id', householdId)
         .eq('status', 'pending')
 
-      const pendingIds = new Set((pending ?? []).map((i: any) => i.item_id).filter(Boolean))
+      const pendingIds = new Set((pending ?? []).map(i => i.item_id).filter(Boolean))
 
       // Insert entries for items that are low but not on the list
       const toAdd = []
@@ -237,6 +246,14 @@ export default function ShoppingPage() {
     setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'pending' } : i))
   }
 
+  function updateQty(item: ShoppingItem, delta: number) {
+    const qty = quantities[item.id] ?? 1
+    const next = Math.max(1, qty + delta)
+    setQuantities(prev => ({ ...prev, [item.id]: next }))
+    // Persist to DB without awaiting (fire and forget)
+    createClient().from('shopping_list').update({ quantity: next }).eq('id', item.id)
+  }
+
   async function clearCompleted() {
     const supabase = createClient()
     const ids = purchased.map(i => i.id)
@@ -282,109 +299,6 @@ export default function ShoppingPage() {
       store: storeFilter !== 'all' ? storeFilter : null,
     })
     clearSearch()
-  }
-
-  const CountBadge = ({ count }: { count: number }) => (
-    <span style={{
-      fontSize: 10, fontWeight: 700, color: 'var(--muted)',
-      background: 'var(--surface)', border: '1px solid var(--divider)',
-      borderRadius: 99, padding: '1px 6px', lineHeight: '14px',
-    }}>
-      {count}
-    </span>
-  )
-
-  const ItemRow = ({ item, checked }: { item: ShoppingItem; checked: boolean }) => {
-    const qty = quantities[item.id] ?? 1
-    const unit = item.items?.default_unit ?? ''
-
-    function updateQty(delta: number) {
-      const next = Math.max(1, qty + delta)
-      setQuantities(prev => ({ ...prev, [item.id]: next }))
-      // Persist to DB without awaiting (fire and forget)
-      createClient().from('shopping_list').update({ quantity: next }).eq('id', item.id)
-    }
-
-    return (
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: '12px 20px',
-        borderBottom: '1px solid var(--divider)',
-        opacity: checked ? 0.45 : 1,
-      }}>
-        {/* Checkbox */}
-        <button
-          type="button"
-          onClick={() => checked ? uncheck(item) : checkOff(item)}
-          style={{
-            width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-            border: checked ? 'none' : '1.5px solid var(--divider)',
-            background: checked ? 'var(--yellow)' : 'transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer',
-          }}
-        >
-          {checked && <i className="fi-rr-check" style={{ fontSize: 11, display: 'block', lineHeight: 1, color: '#4A3300' }} />}
-        </button>
-
-        {/* Emoji */}
-        <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>
-          {item.items?.emoji ?? '🛒'}
-        </span>
-
-        {/* Name + auto indicator */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flex: 1, minWidth: 0 }}>
-          <Link
-            href={item.item_id
-              ? `/inventory/${item.item_id}`
-              : `/add/new?name=${encodeURIComponent(item.item_name)}&shoppingListId=${item.id}`}
-            className="text-sm font-semibold truncate"
-            style={{ color: 'var(--foreground)', textDecoration: checked ? 'line-through' : 'none' }}
-          >
-            {item.item_name}
-          </Link>
-          {item.reason === 'auto' && !checked && (
-            <i className="fi-rr-arrows-repeat" style={{ fontSize: 12, display: 'block', lineHeight: 1, color: 'var(--muted)', flexShrink: 0 }} />
-          )}
-        </div>
-
-        {/* Compact qty stepper — fixed width so all rows align */}
-        {!checked && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0, width: 104 }}>
-            <button
-              type="button"
-              onClick={() => updateQty(-1)}
-              style={{
-                width: 26, height: 26, borderRadius: '8px 0 0 8px',
-                border: '1px solid oklch(100% 0 0 / 0.5)', borderRight: 'none',
-                background: 'lab(99 0.1 1.08)', color: 'var(--foreground)',
-                fontSize: 15, fontWeight: 600, cursor: qty <= 1 ? 'not-allowed' : 'pointer',
-                opacity: qty <= 1 ? 0.3 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >−</button>
-            <div style={{
-              flex: 1, height: 26, padding: '0 4px', overflow: 'hidden',
-              borderTop: '1px solid oklch(100% 0 0 / 0.5)', borderBottom: '1px solid oklch(100% 0 0 / 0.5)',
-              background: 'lab(99 0.1 1.08)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 12, fontWeight: 700, color: 'var(--foreground)', whiteSpace: 'nowrap',
-            }}>
-              {qty}{unit ? ` ${unit}` : ''}
-            </div>
-            <button
-              type="button"
-              onClick={() => updateQty(1)}
-              style={{
-                width: 26, height: 26, borderRadius: '0 8px 8px 0',
-                border: '1px solid oklch(100% 0 0 / 0.5)', borderLeft: 'none',
-                background: 'lab(99 0.1 1.08)', color: 'var(--foreground)',
-                fontSize: 15, fontWeight: 600, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >+</button>
-          </div>
-        )}
-      </div>
-    )
   }
 
   return (
@@ -447,7 +361,16 @@ export default function ShoppingPage() {
                 <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>Running low</span>
                 <CountBadge count={autoPending.length} />
               </div>
-              {autoPending.map(item => <ItemRow key={item.id} item={item} checked={false} />)}
+              {autoPending.map(item => (
+                <ItemRow
+                  key={item.id}
+                  item={item}
+                  checked={false}
+                  qty={quantities[item.id] ?? 1}
+                  onUpdateQty={delta => updateQty(item, delta)}
+                  onToggle={() => checkOff(item)}
+                />
+              ))}
             </div>
           )}
 
@@ -458,7 +381,16 @@ export default function ShoppingPage() {
                 <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>Added</span>
                 <CountBadge count={manualPending.length} />
               </div>
-              {manualPending.map(item => <ItemRow key={item.id} item={item} checked={false} />)}
+              {manualPending.map(item => (
+                <ItemRow
+                  key={item.id}
+                  item={item}
+                  checked={false}
+                  qty={quantities[item.id] ?? 1}
+                  onUpdateQty={delta => updateQty(item, delta)}
+                  onToggle={() => checkOff(item)}
+                />
+              ))}
             </div>
           )}
 
@@ -492,7 +424,16 @@ export default function ShoppingPage() {
                   Clear Done
                 </button>
               </div>
-              {purchased.map(item => <ItemRow key={item.id} item={item} checked />)}
+              {purchased.map(item => (
+                <ItemRow
+                  key={item.id}
+                  item={item}
+                  checked
+                  qty={quantities[item.id] ?? 1}
+                  onUpdateQty={delta => updateQty(item, delta)}
+                  onToggle={() => uncheck(item)}
+                />
+              ))}
             </div>
           )}
         </>
@@ -572,8 +513,10 @@ export default function ShoppingPage() {
               <span style={{
                 width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'var(--yellow-light)', fontSize: 14, fontWeight: 700, color: '#4A3300',
-              }}>+</span>
+                background: 'var(--yellow-light)', color: '#4A3300',
+              }}>
+                <i className="fi-rr-plus" style={{ fontSize: 11, display: 'block', lineHeight: 1 }} />
+              </span>
               <span className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
                 Add &ldquo;{searchQuery.trim()}&rdquo; to list
               </span>
@@ -614,5 +557,110 @@ export default function ShoppingPage() {
         </div>
       </div>
     </AppBackground>
+  )
+}
+
+function CountBadge({ count }: { count: number }) {
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 700, color: 'var(--muted)',
+      background: 'var(--surface)', border: '1px solid var(--divider)',
+      borderRadius: 99, padding: '1px 6px', lineHeight: '14px',
+    }}>
+      {count}
+    </span>
+  )
+}
+
+function ItemRow({ item, checked, qty, onUpdateQty, onToggle }: {
+  item: ShoppingItem
+  checked: boolean
+  qty: number
+  onUpdateQty: (delta: number) => void
+  onToggle: () => void
+}) {
+  const unit = item.items?.default_unit ?? ''
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '12px 20px',
+      borderBottom: '1px solid var(--divider)',
+      opacity: checked ? 0.45 : 1,
+    }}>
+      {/* Checkbox */}
+      <button
+        type="button"
+        onClick={onToggle}
+        style={{
+          width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+          border: checked ? 'none' : '1.5px solid var(--divider)',
+          background: checked ? 'var(--yellow)' : 'transparent',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer',
+        }}
+      >
+        {checked && <i className="fi-rr-check" style={{ fontSize: 11, display: 'block', lineHeight: 1, color: '#4A3300' }} />}
+      </button>
+
+      {/* Emoji */}
+      <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>
+        {item.items?.emoji ?? '🛒'}
+      </span>
+
+      {/* Name + auto indicator */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flex: 1, minWidth: 0 }}>
+        <Link
+          href={item.item_id
+            ? `/inventory/${item.item_id}`
+            : `/add/new?name=${encodeURIComponent(item.item_name)}&shoppingListId=${item.id}`}
+          className="text-sm font-semibold truncate"
+          style={{ color: 'var(--foreground)', textDecoration: checked ? 'line-through' : 'none' }}
+        >
+          {item.item_name}
+        </Link>
+        {item.reason === 'auto' && !checked && (
+          <i className="fi-rr-arrows-repeat" style={{ fontSize: 12, display: 'block', lineHeight: 1, color: 'var(--muted)', flexShrink: 0 }} />
+        )}
+      </div>
+
+      {/* Compact qty stepper — fixed width so all rows align */}
+      {!checked && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0, width: 104 }}>
+          <button
+            type="button"
+            onClick={() => onUpdateQty(-1)}
+            style={{
+              width: 26, height: 26, borderRadius: '8px 0 0 8px',
+              border: '1px solid oklch(100% 0 0 / 0.5)', borderRight: 'none',
+              background: 'lab(99 0.1 1.08)', color: 'var(--foreground)',
+              fontSize: 15, fontWeight: 600, cursor: qty <= 1 ? 'not-allowed' : 'pointer',
+              opacity: qty <= 1 ? 0.3 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >−</button>
+          <div style={{
+            flex: 1, height: 26, padding: '0 4px', overflow: 'hidden',
+            borderTop: '1px solid oklch(100% 0 0 / 0.5)', borderBottom: '1px solid oklch(100% 0 0 / 0.5)',
+            background: 'lab(99 0.1 1.08)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 12, fontWeight: 700, color: 'var(--foreground)', whiteSpace: 'nowrap',
+          }}>
+            {qty}{unit ? ` ${unit}` : ''}
+          </div>
+          <button
+            type="button"
+            onClick={() => onUpdateQty(1)}
+            style={{
+              width: 26, height: 26, borderRadius: '0 8px 8px 0',
+              border: '1px solid oklch(100% 0 0 / 0.5)', borderLeft: 'none',
+              background: 'lab(99 0.1 1.08)', color: 'var(--foreground)',
+              fontSize: 15, fontWeight: 600, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            <i className="fi-rr-plus" style={{ fontSize: 11, display: 'block', lineHeight: 1 }} />
+          </button>
+        </div>
+      )}
+    </div>
   )
 }

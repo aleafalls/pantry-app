@@ -13,6 +13,7 @@ import EmojiPicker, { AVATAR_EMOJI_GROUPS } from '@/components/ui/EmojiPicker'
 import QuantityStepper from '@/components/add/QuantityStepper'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { US_STATES } from '@/lib/constants'
+import { refetchEnrichment } from '@/lib/enrichment'
 
 const AVATAR_COLORS = [
   { bg: '#FFD333', text: '#4A3300' },
@@ -65,6 +66,8 @@ export default function SettingsClient({ userId, displayName, avatarEmoji, house
   const [signingOut, setSigningOut] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<Member | null>(null)
   const [removing, setRemoving] = useState(false)
+  const [enrichingAll, setEnrichingAll] = useState(false)
+  const [enrichProgress, setEnrichProgress] = useState<{ done: number; total: number } | null>(null)
 
   const isOwner = userId === household.owner_id
 
@@ -135,6 +138,44 @@ export default function SettingsClient({ userId, displayName, avatarEmoji, house
     await supabase.from('profiles').update({ household_id: null }).eq('id', removeTarget.id)
     setRemoving(false)
     setRemoveTarget(null)
+    router.refresh()
+  }
+
+  async function enrichAllItems() {
+    setEnrichingAll(true)
+    const supabase = createClient()
+    const { data: items } = await supabase
+      .from('items')
+      .select('id, name, category, default_unit, emoji')
+      .eq('household_id', household.id)
+      .eq('active', true)
+      .is('estimated_price', null)
+
+    const list = items ?? []
+    setEnrichProgress({ done: 0, total: list.length })
+
+    for (let i = 0; i < list.length; i++) {
+      const item = list[i]
+      const result = await refetchEnrichment({
+        name: item.name,
+        category: item.category,
+        unit: item.default_unit,
+        city,
+        state,
+        shoppingTier,
+      })
+      if (result) {
+        // Only backfill price + (if still default) emoji — an existing
+        // item's category/unit/location were already set deliberately when
+        // it was added, so a bulk pass shouldn't silently change them.
+        const updates: { estimated_price: number; emoji?: string } = { estimated_price: result.estimated_price }
+        if (item.emoji === '📦' && result.emoji) updates.emoji = result.emoji
+        await supabase.from('items').update(updates).eq('id', item.id)
+      }
+      setEnrichProgress({ done: i + 1, total: list.length })
+    }
+
+    setEnrichingAll(false)
     router.refresh()
   }
 
@@ -243,6 +284,30 @@ export default function SettingsClient({ userId, displayName, avatarEmoji, house
 
         <p className="text-11" style={{ color: 'var(--muted)', marginTop: -8 }}>
           Helps AI estimate more accurate prices based on where you typically shop.
+        </p>
+
+        <button
+          type="button"
+          onClick={enrichAllItems}
+          disabled={enrichingAll}
+          style={{
+            width: '100%', padding: '12px 16px', borderRadius: 12,
+            border: '1.5px solid var(--divider)', background: 'var(--surface)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            cursor: enrichingAll ? 'default' : 'pointer', fontFamily: 'inherit',
+            color: 'var(--foreground)', fontSize: 14, fontWeight: 600,
+          }}
+        >
+          <i
+            className={enrichingAll ? 'fi-sr-sparkles' : 'fi-rr-sparkles'}
+            style={{ fontSize: 15, display: 'block', lineHeight: 1, color: 'var(--amber)', animation: enrichingAll ? 'spin 1s linear infinite' : 'none' }}
+          />
+          {enrichingAll
+            ? `Estimating prices… ${enrichProgress?.done ?? 0}/${enrichProgress?.total ?? 0}`
+            : 'Estimate prices for existing items'}
+        </button>
+        <p className="text-11" style={{ color: 'var(--muted)', marginTop: -8 }}>
+          Fills in price estimates for any item that doesn&apos;t have one yet — doesn&apos;t change category, unit, or location.
         </p>
 
         {/* ── Members ── */}

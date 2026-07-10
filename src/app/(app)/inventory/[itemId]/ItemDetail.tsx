@@ -8,6 +8,7 @@ import AppBackground from '@/components/layout/AppBackground'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import DrawerSelect from '@/components/ui/DrawerSelect'
 import EmojiPicker from '@/components/ui/EmojiPicker'
 import QuantityStepper from '@/components/add/QuantityStepper'
@@ -204,7 +205,22 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
     setShoppingQty(total > 0 ? total : null)
   }
 
-  useEffect(() => { loadShoppingQty() }, [])
+  useEffect(() => {
+    let cancelled = false
+    async function run() {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('shopping_list')
+        .select('quantity')
+        .eq('item_id', item.id)
+        .eq('status', 'pending')
+      if (cancelled) return
+      const total = (data ?? []).reduce((sum, r) => sum + (r.quantity ?? 1), 0)
+      setShoppingQty(total > 0 ? total : null)
+    }
+    run()
+    return () => { cancelled = true }
+  }, [item.id])
 
   // Load household stores on mount
   useEffect(() => {
@@ -398,7 +414,16 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
               transition: 'all 0.3s',
             }}
           >
-            {updating ? 'Saving…' : justUpdated ? '✓ Updated!' : 'Update Stock'}
+            {updating ? (
+              'Saving…'
+            ) : justUpdated ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <i className="fi-sr-check" style={{ fontSize: 13, display: 'block' }} />
+                Updated!
+              </span>
+            ) : (
+              'Update Stock'
+            )}
           </Button>
 
           {/* Add to List + Cook with — side by side */}
@@ -519,23 +544,10 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
 
                 {detailRow(
                   <Label>Auto add to shopping list</Label>,
-                  <button
-                    onClick={toggleAutoShopping}
-                    style={{
-                      width: 48, height: 28, borderRadius: 99, flexShrink: 0,
-                      background: autoShoppingList ? 'var(--yellow)' : 'var(--divider)',
-                      border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s',
-                    }}
-                  >
-                    <span style={{
-                      position: 'absolute', top: 3, left: autoShoppingList ? 23 : 3,
-                      width: 22, height: 22, borderRadius: '50%', background: '#fff',
-                      transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                    }} />
-                  </button>
+                  <Switch checked={autoShoppingList} onCheckedChange={() => toggleAutoShopping()} />
                 )}
 
-                {detailRow(
+                {autoShoppingList && detailRow(
                   <Label>Auto add when below</Label>,
                   <QuantityStepper value={lowThreshold} onChange={saveThreshold} min={0} />
                 )}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 
 const AVATAR_COLORS = [
@@ -45,8 +45,7 @@ interface Props {
 }
 
 export default function DashboardHeader({ householdName, members }: Props) {
-  const [phrase, setPhrase] = useState('')
-  useEffect(() => { setPhrase(getDailyPhrase()) }, [])
+  const [phrase] = useState(getDailyPhrase)
 
   return (
     <header
@@ -67,8 +66,8 @@ export default function DashboardHeader({ householdName, members }: Props) {
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 500 }}>
-            {phrase || ' '}
+          <span style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 500 }} suppressHydrationWarning>
+            {phrase}
           </span>
           <span style={{
             fontSize: 22,

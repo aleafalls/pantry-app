@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
-import LocationFilter from '@/components/inventory/LocationFilter'
+import { Badge } from '@/components/ui/badge'
+import InventoryFilterBar from '@/components/inventory/InventoryFilterBar'
 import InventoryItemRow from '@/components/inventory/InventoryItemRow'
 import { LOCATIONS } from '@/lib/constants'
 import AppBackground from '@/components/layout/AppBackground'
@@ -15,6 +16,7 @@ interface AggregatedItem {
   emoji: string | null
   category: string
   unit: string
+  tags: string[]
   totalQty: number
   locations: string[]
   primaryLocation: string
@@ -22,13 +24,43 @@ interface AggregatedItem {
   isCritical: boolean
 }
 
+interface InventoryRow {
+  id: string
+  quantity: number
+  unit: string
+  location: string
+  manual_low_flag: boolean
+  items: {
+    id: string
+    name: string
+    emoji: string | null
+    category: string
+    low_threshold: number
+    active: boolean
+    tags: string[] | null
+  }
+}
+
+interface CatalogItem {
+  id: string
+  name: string
+  emoji: string | null
+  default_unit: string
+  category: string
+  default_location: string
+}
+
 export default function InventoryPage() {
   const router = useRouter()
   const [query, setQuery] = useState('')
-  const [locationFilter, setLocationFilter] = useState('all')
+  const [locationFilters, setLocationFilters] = useState<string[]>([])
+  const [categoryFilters, setCategoryFilters] = useState<string[]>([])
+  const [tagFilters, setTagFilters] = useState<string[]>([])
   const [allItems, setAllItems] = useState<AggregatedItem[]>([])
   const [loading, setLoading] = useState(true)
   const [householdId, setHouseholdId] = useState<string | null>(null)
+  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([])
+  const [catalogLoading, setCatalogLoading] = useState(false)
 
   // Load household id then inventory
   useEffect(() => {
@@ -47,7 +79,7 @@ export default function InventoryPage() {
       .from('inventory')
       .select(`
         id, quantity, unit, location, manual_low_flag,
-        items!inner(id, name, emoji, category, low_threshold, active)
+        items!inner(id, name, emoji, category, low_threshold, active, tags)
       `)
       .eq('household_id', householdId)
       .eq('items.active', true)
@@ -56,7 +88,7 @@ export default function InventoryPage() {
 
         // Aggregate by item_id
         const map = new Map<string, AggregatedItem>()
-        for (const row of data as any[]) {
+        for (const row of data as unknown as InventoryRow[]) {
           const item = row.items
           const existing = map.get(item.id)
           if (existing) {
@@ -72,6 +104,7 @@ export default function InventoryPage() {
               emoji: item.emoji,
               category: item.category,
               unit: row.unit,
+              tags: item.tags ?? [],
               totalQty: row.quantity,
               locations: [row.location],
               primaryLocation: row.location,
@@ -83,7 +116,7 @@ export default function InventoryPage() {
 
         // Compute low/critical after full aggregation
         for (const [, agg] of map) {
-          const threshold = (data as any[]).find((r: any) => r.items.id === agg.itemId)?.items.low_threshold ?? 2
+          const threshold = (data as unknown as InventoryRow[]).find(r => r.items.id === agg.itemId)?.items.low_threshold ?? 2
           if (agg.totalQty === 0) agg.isCritical = true
           else if (agg.totalQty <= threshold) agg.isLow = true
         }
@@ -93,15 +126,46 @@ export default function InventoryPage() {
       })
   }, [householdId])
 
+  // Debounced catalog search — supplements the local pantry filter above with
+  // matches from the global catalog, deduped against items already on hand.
+  useEffect(() => {
+    if (!query.trim()) {
+      const clear = setTimeout(() => setCatalogItems([]), 0)
+      return () => clearTimeout(clear)
+    }
+
+    const timer = setTimeout(async () => {
+      setCatalogLoading(true)
+      const supabase = createClient()
+      const { data: catalog } = await supabase
+        .from('catalog')
+        .select('id, name, emoji, default_unit, category, default_location')
+        .ilike('name', `%${query.trim()}%`)
+        .order('name')
+        .limit(20)
+
+      const ownedNames = new Set(allItems.map(i => i.name.toLowerCase()))
+      setCatalogItems((catalog ?? []).filter(c => !ownedNames.has(c.name.toLowerCase())))
+      setCatalogLoading(false)
+    }, 200)
+
+    return () => clearTimeout(timer)
+  }, [query, allItems])
+
+  // Unique tags across all items, for the Tags filter drawer
+  const tagOptions = Array.from(new Set(allItems.flatMap(i => i.tags))).sort((a, b) => a.localeCompare(b))
+
   // Filter
   const filtered = allItems.filter(item => {
     const matchesSearch = !query || item.name.toLowerCase().includes(query.toLowerCase())
-    const matchesLocation = locationFilter === 'all' || item.locations.includes(locationFilter)
-    return matchesSearch && matchesLocation
+    const matchesLocation = locationFilters.length === 0 || locationFilters.some(loc => item.locations.includes(loc))
+    const matchesCategory = categoryFilters.length === 0 || categoryFilters.includes(item.category)
+    const matchesTags = tagFilters.length === 0 || tagFilters.some(tag => item.tags.includes(tag))
+    return matchesSearch && matchesLocation && matchesCategory && matchesTags
   })
 
-  // Group by primary location when "All" selected
-  const grouped = locationFilter === 'all'
+  // Group by primary location when no location filter is active
+  const grouped = locationFilters.length === 0
     ? LOCATIONS.map(loc => ({
         loc,
         items: filtered.filter(i => i.primaryLocation === loc.value),
@@ -125,21 +189,45 @@ export default function InventoryPage() {
           Inventory
         </h1>
 
-        <Input
-          type="text"
-          placeholder="Search items…"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          className="rounded-xl text-sm"
-          style={{
-            background: 'oklch(100% 0 0 / 0.7)',
-            borderColor: 'oklch(100% 0 0 / 0.5)',
-            color: 'var(--foreground)',
-            padding: '10px 14px',
-          }}
-        />
+        <div style={{ position: 'relative' }}>
+          <Input
+            type="text"
+            placeholder="Search items…"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            className="rounded-xl pr-10 text-sm"
+            style={{
+              background: 'oklch(100% 0 0 / 0.7)',
+              borderColor: 'oklch(100% 0 0 / 0.5)',
+              color: 'var(--foreground)',
+              padding: '10px 40px 10px 14px',
+            }}
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              style={{
+                position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                display: 'flex', alignItems: 'center',
+              }}
+              aria-label="Clear search"
+            >
+              <i className="fi-rr-cross-small" style={{ display: 'block', fontSize: 18, lineHeight: 1, color: 'var(--muted)' }} />
+            </button>
+          )}
+        </div>
 
-        <LocationFilter value={locationFilter} onChange={setLocationFilter} />
+        <InventoryFilterBar
+          locationFilters={locationFilters}
+          onLocationFiltersChange={setLocationFilters}
+          categoryFilters={categoryFilters}
+          onCategoryFiltersChange={setCategoryFilters}
+          tagFilters={tagFilters}
+          onTagFiltersChange={setTagFilters}
+          tagOptions={tagOptions}
+        />
       </div>
 
       {/* Content */}
@@ -147,97 +235,109 @@ export default function InventoryPage() {
         <div style={{ padding: '40px 20px', textAlign: 'center' }}>
           <p className="text-sm" style={{ color: 'var(--muted)' }}>Loading…</p>
         </div>
-      ) : filtered.length === 0 ? (
-        <div style={{ padding: '40px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-          <div style={{ fontSize: 40 }}>📦</div>
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>
-            {query ? `No items matching "${query}"` : 'No items in your pantry yet.'}
-          </p>
-          {query.trim() && (
-            <a
-              href={`/add/new?name=${encodeURIComponent(query.trim())}`}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '10px 18px', borderRadius: 99,
-                background: 'var(--yellow-light)', border: '2px solid var(--yellow)',
-                color: '#4A3300', fontSize: 14, fontWeight: 700,
-                textDecoration: 'none',
-              }}
-            >
-              <span style={{ fontSize: 16 }}>+</span>
-              Add &ldquo;{query.trim()}&rdquo; to pantry
-            </a>
-          )}
-        </div>
-      ) : grouped ? (
-        // Grouped by location
-        <>
-          {grouped.map(({ loc, items }) => (
-            <div key={loc.value}>
-              <div style={{ padding: '12px 20px 4px' }}>
-                <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
-                  {loc.emoji} {loc.label}
-                </span>
-              </div>
-              {items.map(item => (
-                <InventoryItemRow
-                  key={item.itemId}
-                  {...item}
-                  onTap={() => router.push(`/inventory/${item.itemId}`)}
-                />
-              ))}
-            </div>
-          ))}
-          {query.trim() && (
-            <a
-              href={`/add/new?name=${encodeURIComponent(query.trim())}`}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '13px 20px',
-                borderTop: '1px solid var(--divider)',
-                textDecoration: 'none',
-              }}
-            >
-              <span style={{
-                width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'var(--yellow-light)', fontSize: 14, fontWeight: 700, color: '#4A3300',
-              }}>+</span>
-              <span className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
-                Add &ldquo;{query.trim()}&rdquo; to pantry
-              </span>
-            </a>
-          )}
-        </>
       ) : (
-        // Flat filtered list
         <>
-          {filtered.map(item => (
-            <InventoryItemRow
-              key={item.itemId}
-              {...item}
-              onTap={() => router.push(`/inventory/${item.itemId}`)}
-            />
-          ))}
+          {filtered.length === 0 ? (
+            <div style={{ padding: '40px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+              <div style={{ fontSize: 40 }}>{query ? '🔍' : '📦'}</div>
+              <p className="text-sm" style={{ color: 'var(--muted)' }}>
+                {query ? `No items matching "${query}" in your pantry` : 'No items in your pantry yet.'}
+              </p>
+            </div>
+          ) : grouped ? (
+            // Grouped by location
+            grouped.map(({ loc, items }) => (
+              <div key={loc.value}>
+                <div style={{ padding: '12px 20px 4px' }}>
+                  <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
+                    {loc.emoji} {loc.label}
+                  </span>
+                </div>
+                {items.map(item => (
+                  <InventoryItemRow
+                    key={item.itemId}
+                    {...item}
+                    onTap={() => router.push(`/inventory/${item.itemId}`)}
+                  />
+                ))}
+              </div>
+            ))
+          ) : (
+            // Flat filtered list
+            filtered.map(item => (
+              <InventoryItemRow
+                key={item.itemId}
+                {...item}
+                onTap={() => router.push(`/inventory/${item.itemId}`)}
+              />
+            ))
+          )}
+
+          {/* Catalog matches + create-new — supplements the pantry list above,
+              same "From catalog" / "Create" pattern as the Add screen. */}
           {query.trim() && (
-            <a
-              href={`/add/new?name=${encodeURIComponent(query.trim())}`}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '13px 20px',
-                borderTop: '1px solid var(--divider)',
-                textDecoration: 'none',
-              }}
-            >
-              <span style={{
-                width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: 'var(--yellow-light)', fontSize: 14, fontWeight: 700, color: '#4A3300',
-              }}>+</span>
-              <span className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
-                Add &ldquo;{query.trim()}&rdquo; to pantry
-              </span>
-            </a>
+            <>
+              {catalogItems.length > 0 && (
+                <>
+                  <div style={{ padding: '12px 20px 4px' }}>
+                    <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
+                      From catalog
+                    </span>
+                  </div>
+                  {catalogItems.map(item => (
+                    <button
+                      key={item.id}
+                      onClick={() => router.push(`/add/restock?catalogId=${item.id}`)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        width: '100%', padding: '12px 20px',
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        borderBottom: '1px solid var(--divider)',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <span style={{ fontSize: 22, lineHeight: 1, width: 28, flexShrink: 0 }}>
+                        {item.emoji ?? '📦'}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p className="text-sm font-semibold truncate" style={{ color: 'var(--foreground)' }}>{item.name}</p>
+                        <p className="text-11" style={{ color: 'var(--muted)' }}>{item.category}</p>
+                      </div>
+                      <Badge className="text-11 shrink-0" style={{ background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--divider)' }}>
+                        catalog
+                      </Badge>
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {catalogLoading && (
+                <div style={{ padding: '12px 20px' }}>
+                  <p className="text-sm" style={{ color: 'var(--muted)' }}>Searching catalog…</p>
+                </div>
+              )}
+
+              <a
+                href={`/add/new?name=${encodeURIComponent(query.trim())}`}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '13px 20px',
+                  borderTop: '1px solid var(--divider)',
+                  textDecoration: 'none',
+                }}
+              >
+                <span style={{
+                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'var(--yellow-light)', color: '#4A3300',
+                }}>
+                  <i className="fi-rr-plus" style={{ fontSize: 12, display: 'block', lineHeight: 1 }} />
+                </span>
+                <span className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
+                  Create &ldquo;{query.trim()}&rdquo;
+                </span>
+              </a>
+            </>
           )}
         </>
       )}

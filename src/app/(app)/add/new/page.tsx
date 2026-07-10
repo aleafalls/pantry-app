@@ -8,6 +8,7 @@ import AppBackground from '@/components/layout/AppBackground'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
 import DrawerSelect from '@/components/ui/DrawerSelect'
 import EmojiPicker from '@/components/ui/EmojiPicker'
 import QuantityStepper from '@/components/add/QuantityStepper'
@@ -36,7 +37,7 @@ function NewItemForm() {
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0])
 
   // ── Details ───────────────────────────────────────────────
-  const [lowThreshold, setLowThreshold] = useState(2)
+  const [lowThreshold, setLowThreshold] = useState(1)
   const [autoShoppingList, setAutoShoppingList] = useState(true)
   const [category, setCategory] = useState(searchParams.get('category') ?? '')
   const [preferredStores, setPreferredStores] = useState<string[]>([])
@@ -303,24 +304,10 @@ function NewItemForm() {
 
         {detailRow(
           <Label>Auto add to shopping list</Label>,
-          <button
-            type="button"
-            onClick={() => setAutoShoppingList(v => !v)}
-            style={{
-              width: 48, height: 28, borderRadius: 99, flexShrink: 0,
-              background: autoShoppingList ? 'var(--yellow)' : 'var(--divider)',
-              border: 'none', cursor: 'pointer', position: 'relative', transition: 'background 0.2s',
-            }}
-          >
-            <span style={{
-              position: 'absolute', top: 3, left: autoShoppingList ? 23 : 3,
-              width: 22, height: 22, borderRadius: '50%', background: '#fff',
-              transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-            }} />
-          </button>
+          <Switch checked={autoShoppingList} onCheckedChange={v => setAutoShoppingList(v)} />
         )}
 
-        {detailRow(
+        {autoShoppingList && detailRow(
           <Label>Auto add when below</Label>,
           <QuantityStepper value={lowThreshold} onChange={setLowThreshold} min={0} />
         )}

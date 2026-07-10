@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
-import PageHeader from '@/components/layout/PageHeader'
 import AppBackground from '@/components/layout/AppBackground'
 import BarcodeScanner from '@/components/add/BarcodeScanner'
 import { prewarmEnrichment } from '@/lib/enrichment'
@@ -64,7 +63,10 @@ export default function AddPage() {
   // Debounced search
   useEffect(() => {
     if (!householdId) return
-    if (!query.trim()) { setHouseholdItems([]); setCatalogItems([]); return }
+    if (!query.trim()) {
+      const clear = setTimeout(() => { setHouseholdItems([]); setCatalogItems([]) }, 0)
+      return () => clearTimeout(clear)
+    }
 
     const timer = setTimeout(async () => {
       setLoading(true)
@@ -156,9 +158,9 @@ export default function AddPage() {
         borderBottom: '1px solid oklch(100% 0 0 / 0.4)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <a href="/" style={{ color: 'var(--muted)', textDecoration: 'none', flexShrink: 0, lineHeight: 1 }} aria-label="Go back">
+          <Link href="/" style={{ color: 'var(--muted)', textDecoration: 'none', flexShrink: 0, lineHeight: 1 }} aria-label="Go back">
             <i className="fi-rr-angle-left" style={{ fontSize: 18, display: 'block' }} />
-          </a>
+          </Link>
           <div style={{ flex: 1, position: 'relative' }}>
             <Input
               ref={inputRef}
@@ -166,14 +168,28 @@ export default function AddPage() {
               placeholder="Search or add an item…"
               value={query}
               onChange={e => setQuery(e.target.value)}
-              className="rounded-xl pr-10 text-sm"
+              className="rounded-xl text-sm"
               style={{
                 background: 'oklch(100% 0 0 / 0.7)',
                 borderColor: 'oklch(100% 0 0 / 0.5)',
                 color: 'var(--foreground)',
-                padding: '10px 40px 10px 14px',
+                padding: query ? '10px 68px 10px 14px' : '10px 40px 10px 14px',
               }}
             />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                style={{
+                  position: 'absolute', right: 38, top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                  display: 'flex', alignItems: 'center',
+                }}
+                aria-label="Clear search"
+              >
+                <i className="fi-rr-cross-small" style={{ display: 'block', fontSize: 18, lineHeight: 1, color: 'var(--muted)' }} />
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setScannerOpen(true)}
@@ -320,9 +336,9 @@ export default function AddPage() {
             <span style={{
               width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'var(--yellow-light)', fontSize: 14, fontWeight: 700, color: '#4A3300',
+              background: 'var(--yellow-light)', color: '#4A3300',
             }}>
-              +
+              <i className="fi-rr-plus" style={{ fontSize: 12, display: 'block', lineHeight: 1 }} />
             </span>
             <p className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
               Create &ldquo;{query.trim()}&rdquo;

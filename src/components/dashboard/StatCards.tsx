@@ -1,6 +1,7 @@
 interface Props {
   itemCount: number
   lowCount: number
+  estValue: number
 }
 
 const glassBase: React.CSSProperties = {
@@ -9,7 +10,7 @@ const glassBase: React.CSSProperties = {
   border: '1px solid oklch(100% 0 0 / 0.6)',
 }
 
-export default function StatCards({ itemCount, lowCount }: Props) {
+export default function StatCards({ itemCount, lowCount, estValue }: Props) {
   const hasLow = lowCount > 0
 
   return (
@@ -23,7 +24,9 @@ export default function StatCards({ itemCount, lowCount }: Props) {
 
       <div className="flex-1 rounded-14 px-3 py-2 flex flex-col gap-0.5"
         style={{ ...glassBase, background: 'var(--glass-card)', boxShadow: 'oklch(1 0 0 / 0.7) 0px 0px 0px inset, oklch(0.3 0.02 85 / 0.25) 0px 4px 14px -8px' }}>
-        <span className="text-17 font-extrabold" style={{ color: 'var(--muted)' }}>—</span>
+        <span className="text-17 font-extrabold" style={{ color: 'var(--foreground)' }}>
+          ${Math.round(estValue).toLocaleString()}
+        </span>
         <span className="text-11 font-semibold" style={{ color: 'var(--muted)' }}>Est. value</span>
       </div>
 

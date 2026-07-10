@@ -974,25 +974,50 @@ Already done if Phase 13 is complete. If not, do step 13.1 first — this phase'
 
 ### 14.4 — Chef Tab: Tabs, My Recipes, Recipe Detail
 
-1. 🤖 **Claude writes:** Replace the placeholder in `src/app/(app)/chef/page.tsx` with a two-tab layout: **Suggestions** / **My Recipes**.
-2. 🤖 **Claude writes:** My Recipes tab — card list of saved recipes (name, image if present, ingredient count). Empty state prompts "Save your first recipe" → routes to `chef/new`.
-3. 🤖 **Claude writes:** `src/app/(app)/chef/[recipeId]/page.tsx` — recipe detail: ingredients, instructions, edit and delete actions.
+Superseded the original two-tab (Suggestions / My Recipes) plan with a four-tab structure — **All / Tonight / Ideas / Saved** — matching a design concept the user provided directly.
+
+1. ✅ **Built:** `src/components/chef/ChefTabs.tsx` — underlined tab row (active tab bold + yellow underline, matches the provided design rather than the app's existing pill-filter pattern), rendered inside `PageHeader`'s children slot on all four Chef routes (`/chef`, `/chef/tonight`, `/chef/ideas`, `/chef/saved`) so any tab can be reached directly, not just via "All".
+2. ✅ **Built:** `/chef` (All) is the overview — condensed "What to Make Tonight" (2 cards, real data), a "Recipe Ideas" ask-box preview (`RecipeIdeasPreview.tsx`), and a "Saved Recipes" preview (`SavedRecipesPreview.tsx`).
+3. ✅ **Built (structure only):** `/chef/ideas` and `/chef/saved` — dedicated pages exist and are wired into navigation, but show honest empty/coming-soon states rather than fake data, since neither the Recipe Ideas endpoint (14.5b) nor the `recipes` table (14.0) exists yet. The ask box on `/chef` and `/chef/ideas` accepts a query and passes it via `?q=` — not yet wired to an AI call.
+4. **Not yet built:** `src/app/(app)/chef/[recipeId]/page.tsx` recipe detail, and any real "save" functionality — both depend on 14.0/14.3 landing first.
 
 ---
 
-### 14.5 — AI Recipe Suggestions
+### 14.5 — AI Suggestions: Two Modes, Not One
 
-1. 🤖 **Claude writes:** `src/app/api/ai/recipes/route.ts` — passes the full inventory list plus the household's `household_preferences` (14.1) and `default_servings` (Phase 10.1) to Claude. Dietary restrictions are hard excludes; favorite cuisines and macro goals are soft ranking boosts. Prioritizes oldest and low-stock inventory items, minimizes missing ingredients. Returns 3–5 suggestions.
-2. 🤖 **Claude writes:** Suggestions tab UI — card list, each card: recipe name, 1-sentence description, pantry items used, additional ingredients needed, match score ("You have 8 of 10 ingredients"). Expandable on tap.
-3. 🤖 **Claude writes:** "Add missing ingredients to list" button on each suggestion card — writes missing ingredients to `shopping_list` with `reason: recipe`.
+The Suggestions tab splits into two sections rather than a single suggestion list — they serve genuinely different jobs. Full specs: [`ai-prompts/what-to-make-tonight.md`](../ai-prompts/what-to-make-tonight.md) and [`ai-prompts/recipe-ideas.md`](../ai-prompts/recipe-ideas.md).
+
+| | What to Make Tonight | Recipe Ideas |
+|---|---|---|
+| Job | Waste reduction — use what's already around | Discovery — find something specific worth making |
+| Output | Loose meal idea + brief guidance, not a formal recipe | Named recipe with full ingredients + instructions |
+| Weights oldest/high-quantity items | Yes | No — match quality and dish quality come first |
+| Shopping | Toggle: strict (0 missing) or open (~2 minor extras) | Always allowed — filling gaps is expected |
+| Save to My Recipes | No — disposable by design | Yes — output shape matches `recipe_ingredients` directly |
+
+**14.5a — "What to Make Tonight" endpoint — ✅ built**
+1. 🤖 **Claude writes:** `src/app/api/ai/what-to-make-tonight/route.ts` — inventory, server-computed `priority_items` (oldest + highest-quantity, reusing the same logic as the dashboard's "Use These Up", shared via `src/lib/chefData.ts`), the shopping-tolerance toggle, `default_servings`. Model: `claude-opus-4-8` (judgment/creativity task, not classification — doesn't default to Haiku like item enrichment).
+2. 🤖 **Claude writes:** Chef tab section (`ChefSuggestions.tsx`) — grid of up to 4 cards, generated with the toggle defaulted to strict.
+3. 🤖 **Claude writes:** "View More" (`chef/tonight/` + `TonightResults.tsx`) — re-runs the prompt (fresh call), dedicated page where the toggle is actually exposed and re-triggers the prompt on change, plus a manual "Get new ideas" regenerate button.
+4. Dashboard teaser renamed "What to Cook Now", links straight to `/chef` (no more "coming soon" sheet).
+
+> ⚠️ **Deferred from this pass:** `household_preferences` isn't wired in yet (Phase 14.1's table/screen don't exist yet — the endpoint defaults to no restrictions/cuisines/macros until that lands). Ingredient-level tap-to-escalate into Recipe Ideas isn't built either, since Recipe Ideas doesn't exist yet. Both noted in `ai-prompts/what-to-make-tonight.md`.
+
+**14.5b — "Recipe Ideas" endpoint**
+1. 🤖 **Claude writes:** `src/app/api/ai/recipe-ideas/route.ts` — inventory, optional `anchor_ingredient`, `household_preferences`, `default_servings`. Returns structured `ingredients` (name/quantity/unit/have_on_hand per item) rather than flat name lists, so a saved suggestion maps directly onto `recipe_ingredients`.
+2. 🤖 **Claude writes:** Chef tab section — small grid, each card with a match-percentage badge computed client-side from `ingredients` (never trusted from the model directly).
+3. 🤖 **Claude writes:** "View More" — same pattern as 14.5a, dedicated expanded page.
+4. 🤖 **Claude writes:** Ingredient-tap escalation — tapping an ingredient on a What to Make Tonight card opens the Recipe Ideas expanded page anchored to that ingredient, with a "Recipe ideas for {ingredient}" header instead of the generic one.
+5. 🤖 **Claude writes:** "Save to My Recipes" action on each card — inserts into `recipes` + `recipe_ingredients` using the returned `ingredients` array directly.
+6. 🤖 **Claude writes:** "Add missing ingredients to list" button — writes ingredients where `have_on_hand: false` to `shopping_list` with `reason: recipe`.
 
 ---
 
 ### 14.6 — Wire Up the Dashboard Recipe Teaser
 
-1. 🤖 **Claude writes:** Update `RecipeTeaser.tsx` — removes the "coming soon" state, now routes to `/chef` (Suggestions tab).
+1. 🤖 **Claude writes:** Update `RecipeTeaser.tsx` — removes the "coming soon" state, now routes to `/chef` (Suggestions tab, showing both sections above).
 
-✅ **Verify:** Tap "What can I make?" on the dashboard — lands on the Chef Suggestions tab with 3–5 recipe cards from real inventory. Save a manual recipe via `chef/new` — it appears in My Recipes and its detail page opens.
+✅ **Verify:** Tap "What can I make?" on the dashboard — lands on Chef with both a What to Make Tonight grid and a Recipe Ideas grid populated from real inventory. Tap an ingredient in a tonight-suggestion — lands on Recipe Ideas anchored to it. Save a manual recipe via `chef/new` and save a Recipe Ideas suggestion — both appear in My Recipes.
 
 ---
 

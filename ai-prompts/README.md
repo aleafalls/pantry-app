@@ -6,7 +6,8 @@ Each file covers: trigger (when it fires), model, input, output schema, and the 
 
 | Prompt | File | Phase | Status |
 |---|---|---|---|
-| Item Enrichment (category, unit, emoji, price) | [item-enrichment.md](item-enrichment.md) | 13 | Designed, not yet built |
-| Recipe Suggestions | — | 14 | Not yet designed |
+| Item Enrichment (category, unit, location, emoji, price) | [item-enrichment.md](item-enrichment.md) | 13 | Built |
+| What to Make Tonight | [what-to-make-tonight.md](what-to-make-tonight.md) | 14 | Built |
+| Recipe Ideas | [recipe-ideas.md](recipe-ideas.md) | 14 | Designed, not yet built |
 | Web Recipe Extraction | — | 15 | Not yet designed |
 | Photo Recipe Extraction | — | 16 | Not yet designed |

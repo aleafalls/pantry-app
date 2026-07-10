@@ -34,10 +34,11 @@ export default function PageHeader({ title, backHref, rightAction, children }: P
         display: 'flex',
         flexDirection: 'column',
         gap: 10,
-        background: 'oklch(99% 0.003 85 / 0.85)',
+        background: 'oklch(99% 0.003 85 / 0.75)',
         backdropFilter: 'blur(20px) saturate(160%)',
         WebkitBackdropFilter: 'blur(20px) saturate(160%)',
-        borderBottom: '1px solid oklch(100% 0 0 / 0.4)',
+        borderBottom: '1px solid oklch(100% 0 0 / 0.5)',
+        boxShadow: '0 1px 0 oklch(100% 0 0 / 0.6) inset',
       }}
     >
       {/* Title row — three equal-width columns so title stays centered */}

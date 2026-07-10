@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
   Drawer, DrawerContent, DrawerHeader, DrawerTitle,
 } from '@/components/ui/drawer'
@@ -35,6 +35,8 @@ interface Props {
   /** Multi-select only: inline input for creating a new option */
   onAddNew?: (name: string) => Promise<void>
   addNewPlaceholder?: string
+  /** Fully custom trigger — receives a function to open the drawer */
+  renderTrigger?: (open: () => void) => ReactNode
 }
 
 function Pill({ label, selected, disabled, onSelect }: {
@@ -70,6 +72,7 @@ export default function DrawerSelect({
   options, groups, searchable = false,
   chipTrigger = false, disabledValues = [],
   onAddNew, addNewPlaceholder = 'Add new…',
+  renderTrigger,
 }: Props) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -143,7 +146,9 @@ export default function DrawerSelect({
     <Drawer open={open} onOpenChange={o => { if (!o) closeDrawer(); else setOpen(true) }}>
 
       {/* Trigger */}
-      {chipTrigger ? (
+      {renderTrigger ? (
+        renderTrigger(() => setOpen(true))
+      ) : chipTrigger ? (
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -180,25 +185,25 @@ export default function DrawerSelect({
 
       {/* Drawer */}
       <DrawerContent
-        className="flex flex-col outline-none"
+        className="flex flex-col outline-none overflow-hidden"
         style={{ background: 'oklch(97% 0.006 85)', border: 'none', maxHeight: '65vh' }}
       >
         <DrawerHeader className="flex items-center justify-between gap-4 px-5 pt-2 pb-1 shrink-0">
-          <DrawerTitle className="text-[20px] font-extrabold m-0" style={{ color: 'var(--foreground)' }}>
+          <DrawerTitle className="text-20 font-extrabold m-0" style={{ color: 'var(--foreground)' }}>
             {title}
           </DrawerTitle>
           <button
             type="button"
             onClick={closeDrawer}
-            className="flex items-center justify-center rounded-full text-lg font-semibold shrink-0"
+            className="flex items-center justify-center rounded-full shrink-0"
             style={{ width: 36, height: 36, background: 'var(--surface)', border: 'none', cursor: 'pointer', color: 'var(--foreground)' }}
           >
-            ×
+            <i className="fi-rr-cross-small" style={{ fontSize: 16, display: 'block' }} />
           </button>
         </DrawerHeader>
 
         {/* Pills */}
-        <div className="no-scrollbar flex-1 overflow-y-auto px-5 py-2">
+        <div className="no-scrollbar flex-1 min-h-0 overflow-y-auto px-5 py-2">
           {filteredGroups ? (
             filteredGroups.map(group => (
               <div key={group.label} className="mb-5">

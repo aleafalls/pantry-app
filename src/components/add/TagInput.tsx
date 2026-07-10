@@ -49,9 +49,9 @@ export default function TagInput({ tags, onChange }: Props) {
               <button
                 type="button"
                 onClick={() => removeTag(tag)}
-                style={{ fontSize: 14, lineHeight: 1, color: 'var(--muted)', cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}
+                style={{ display: 'flex', lineHeight: 1, color: 'var(--muted)', cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}
               >
-                ×
+                <i className="fi-rr-cross-small" style={{ fontSize: 12, display: 'block' }} />
               </button>
             </span>
           ))}

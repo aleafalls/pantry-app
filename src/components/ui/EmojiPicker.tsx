@@ -190,16 +190,16 @@ export default function EmojiPicker({
       >
         {/* Header */}
         <DrawerHeader className="flex items-center justify-between gap-4 px-5 pt-2 pb-1 shrink-0">
-          <DrawerTitle className="text-[20px] font-extrabold m-0" style={{ color: 'var(--foreground)' }}>
+          <DrawerTitle className="text-20 font-extrabold m-0" style={{ color: 'var(--foreground)' }}>
             Emoji
           </DrawerTitle>
           <button
             type="button"
             onClick={() => { setOpen(false); setSearch('') }}
-            className="flex items-center justify-center rounded-full text-lg font-semibold shrink-0"
+            className="flex items-center justify-center rounded-full shrink-0"
             style={{ width: 36, height: 36, background: 'var(--surface)', border: 'none', cursor: 'pointer', color: 'var(--foreground)' }}
           >
-            ×
+            <i className="fi-rr-cross-small" style={{ fontSize: 16, display: 'block' }} />
           </button>
         </DrawerHeader>
 
