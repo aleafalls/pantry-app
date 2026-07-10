@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -39,11 +40,20 @@ const FLOATING_CARDS: {
   { emoji: '🥩', size: 58, rotate: -4, anim: 'float-2', duration: '7.8s', delay: '2.0s',  bottom: 275, left: 148 },
 ]
 
-export default function AuthPage() {
+function AuthForm() {
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Surface a failed magic-link exchange (see src/app/auth/callback/route.ts)
+  // instead of silently landing back on a blank sign-in form.
+  useEffect(() => {
+    const callbackError = searchParams.get('error')
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: surface a failed magic-link exchange from the callback redirect
+    if (callbackError) setError(callbackError)
+  }, [searchParams])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -235,6 +245,14 @@ export default function AuthPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense>
+      <AuthForm />
+    </Suspense>
   )
 }
 
