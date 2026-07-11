@@ -1,7 +1,7 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -41,21 +41,28 @@ const FLOATING_CARDS: {
 ]
 
 function AuthForm() {
+  const router = useRouter()
   const searchParams = useSearchParams()
+  const [step, setStep] = useState<'email' | 'code'>('email')
   const [email, setEmail] = useState('')
-  const [sent, setSent] = useState(false)
+  const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
+  const [verifying, setVerifying] = useState(false)
   const [error, setError] = useState('')
+  const codeInputRef = useRef<HTMLInputElement>(null)
 
   // Surface a failed magic-link exchange (see src/app/auth/callback/route.ts)
-  // instead of silently landing back on a blank sign-in form.
+  // — kept as a fallback path for anyone who taps the link instead of
+  // entering the code, e.g. on a device where the installed home-screen
+  // app and the regular browser are separate storage contexts and the
+  // code is the only path that works reliably there.
   useEffect(() => {
     const callbackError = searchParams.get('error')
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: surface a failed magic-link exchange from the callback redirect
     if (callbackError) setError(callbackError)
   }, [searchParams])
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function requestCode(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
@@ -65,9 +72,31 @@ function AuthForm() {
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     })
     if (error) { setError(error.message); setLoading(false); return }
-    setSent(true)
+    setStep('code')
     setLoading(false)
   }
+
+  async function verifyCode(e?: React.FormEvent) {
+    e?.preventDefault()
+    if (code.trim().length < 6) return
+    setVerifying(true)
+    setError('')
+    const supabase = createClient()
+    const { error } = await supabase.auth.verifyOtp({ email, token: code.trim(), type: 'email' })
+    if (error) { setError(error.message); setVerifying(false); return }
+    router.push('/')
+    router.refresh()
+  }
+
+  // Auto-submit as soon as a 6-digit code is present — covers both the
+  // native mail-app autofill suggestion and manual entry.
+  useEffect(() => {
+    if (step === 'code' && code.trim().length === 6 && !verifying) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: auto-submit once a full 6-digit code is present (autofill or manual entry)
+      verifyCode()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when the code value changes
+  }, [code])
 
   return (
     <div style={{
@@ -186,31 +215,69 @@ function AuthForm() {
         border: '1px solid oklch(100% 0 0 / 0.6)',
         boxShadow: 'oklch(1 0 0 / 0.7) 0px 0px 0px inset, oklch(0.3 0.02 85 / 0.25) 0px 8px 32px -8px',
       }}>
-        {sent ? (
-          <div style={{ textAlign: 'center', padding: '8px 0' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>📬</div>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--foreground)', marginBottom: 6 }}>
-              Check your email
-            </h2>
-            <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.5 }}>
-              We sent a sign-in link to <strong>{email}</strong>. Tap it to continue.
-            </p>
-            <p style={{ fontSize: 12, color: 'var(--muted-light)', marginTop: 8 }}>
-              Didn&apos;t get it? Check your spam or{' '}
+        {step === 'code' ? (
+          <form onSubmit={verifyCode} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--foreground)', margin: '0 0 6px' }}>
+                Enter your code
+              </h2>
+              <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.5, margin: 0 }}>
+                We sent a 6-digit code to <strong>{email}</strong>.
+              </p>
+            </div>
+            <Input
+              ref={codeInputRef}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              autoComplete="one-time-code"
+              maxLength={6}
+              required
+              autoFocus
+              placeholder="000000"
+              value={code}
+              onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              className="rounded-xl text-center"
+              style={{ color: 'var(--foreground)', fontSize: 22, letterSpacing: '0.3em', fontWeight: 700 }}
+            />
+            {error && (
+              <p style={{ fontSize: 13, color: 'var(--red)', margin: 0 }}>{error}</p>
+            )}
+            <Button
+              type="submit"
+              variant="brand"
+              disabled={verifying || code.trim().length < 6}
+              style={{
+                background: 'linear-gradient(150deg, var(--yellow-light), var(--yellow))',
+                color: '#4A3300',
+                padding: '14px 16px',
+                fontSize: 15,
+                fontWeight: 700,
+              }}
+            >
+              {verifying ? 'Verifying…' : 'Verify & sign in'}
+            </Button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <button
-                onClick={() => setSent(false)}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: 12, color: 'var(--amber)', fontWeight: 700,
-                  fontFamily: 'inherit', padding: 0,
-                }}
+                type="button"
+                onClick={() => { setStep('email'); setCode(''); setError('') }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--muted)', fontFamily: 'inherit', padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}
               >
-                try again
+                <i className="fi-rr-angle-left" style={{ fontSize: 12, display: 'block', lineHeight: 1 }} />
+                Use a different email
               </button>
-            </p>
-          </div>
+              <button
+                type="button"
+                onClick={e => requestCode(e as unknown as React.FormEvent)}
+                disabled={loading}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--amber)', fontWeight: 700, fontFamily: 'inherit', padding: 0 }}
+              >
+                {loading ? 'Sending…' : 'Resend code'}
+              </button>
+            </div>
+          </form>
         ) : (
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <form onSubmit={requestCode} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--foreground)', margin: 0 }}>
               Enter your email to get started or log in
             </p>
@@ -239,7 +306,7 @@ function AuthForm() {
                 fontWeight: 700,
               }}
             >
-              {loading ? 'Sending…' : 'Send magic link'}
+              {loading ? 'Sending…' : 'Send code'}
             </Button>
           </form>
         )}
