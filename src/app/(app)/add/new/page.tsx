@@ -195,8 +195,8 @@ function NewItemForm() {
 
   // ── Layout helpers (same pattern as ItemDetail) ───────────
 
-  const detailRow = (left: React.ReactNode, right: React.ReactNode) => (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+  const detailRow = (key: string, left: React.ReactNode, right: React.ReactNode) => (
+    <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
       <div style={{ flex: 1, minWidth: 0 }}>{left}</div>
       <div style={{ width: 160, flexShrink: 0, display: 'flex', justifyContent: 'flex-end' }}>{right}</div>
     </div>
@@ -259,11 +259,13 @@ function NewItemForm() {
         {sectionLabel('Stock')}
 
         {detailRow(
+          'quantity',
           <Label>Quantity</Label>,
           <QuantityStepper value={quantity} onChange={setQuantity} min={1} />
         )}
 
         {detailRow(
+          'unit',
           <Label>Unit</Label>,
           <DrawerSelect
             title="Unit"
@@ -278,6 +280,7 @@ function NewItemForm() {
         )}
 
         {detailRow(
+          'location',
           <Label>Location</Label>,
           <DrawerSelect
             title="Location"
@@ -289,6 +292,7 @@ function NewItemForm() {
         )}
 
         {detailRow(
+          'purchase-date',
           <Label>Purchase date</Label>,
           <Input
             type="date"
@@ -303,16 +307,19 @@ function NewItemForm() {
         {sectionLabel('Details')}
 
         {detailRow(
+          'auto-shopping-list',
           <Label>Auto add to shopping list</Label>,
           <Switch checked={autoShoppingList} onCheckedChange={v => setAutoShoppingList(v)} />
         )}
 
         {autoShoppingList && detailRow(
+          'low-threshold',
           <Label>Auto add when below</Label>,
           <QuantityStepper value={lowThreshold} onChange={setLowThreshold} min={0} />
         )}
 
         {detailRow(
+          'category',
           <Label>Category</Label>,
           <DrawerSelect
             title="Category"
@@ -324,6 +331,7 @@ function NewItemForm() {
         )}
 
         {detailRow(
+          'preferred-stores',
           <Label>Preferred stores</Label>,
           <DrawerSelect
             title="Preferred Stores"

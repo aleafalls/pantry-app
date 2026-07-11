@@ -327,8 +327,8 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
 
   // ── Shared layout helpers ─────────────────────────────────
 
-  const detailRow = (left: React.ReactNode, right: React.ReactNode) => (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+  const detailRow = (key: string, left: React.ReactNode, right: React.ReactNode) => (
+    <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
       <div style={{ flex: 1, minWidth: 0 }}>{left}</div>
       <div style={{ width: 160, flexShrink: 0, display: 'flex', justifyContent: 'flex-end' }}>{right}</div>
     </div>
@@ -396,6 +396,7 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
 
           {/* Qty stepper */}
           {detailRow(
+            'quantity',
             <Label>Quantity on hand</Label>,
             <QuantityStepper value={stockQty} onChange={setStockQty} min={0} />
           )}
@@ -509,6 +510,7 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
                 </div>
 
                 {detailRow(
+                  'unit',
                   <Label>Unit</Label>,
                   <DrawerSelect
                     title="Unit"
@@ -528,6 +530,7 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
                   return (
                     <div key={row.id}>
                       {detailRow(
+                        `location-${row.id}`,
                         <Label>{rows.length > 1 ? `Location ${i + 1}` : 'Location'}</Label>,
                         <DrawerSelect
                           title="Location"
@@ -543,17 +546,20 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
                 })}
 
                 {detailRow(
+                  'auto-shopping-list',
                   <Label>Auto add to shopping list</Label>,
                   <Switch checked={autoShoppingList} onCheckedChange={() => toggleAutoShopping()} />
                 )}
 
                 {autoShoppingList && detailRow(
+                  'low-threshold',
                   <Label>Auto add when below</Label>,
                   <QuantityStepper value={lowThreshold} onChange={saveThreshold} min={0} />
                 )}
 
 
                 {detailRow(
+                  'category',
                   <Label>Category</Label>,
                   <DrawerSelect
                     title="Category"
@@ -564,6 +570,7 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
                 )}
 
                 {detailRow(
+                  'preferred-stores',
                   <Label>Preferred stores</Label>,
                   <DrawerSelect
                     title="Preferred Stores"
