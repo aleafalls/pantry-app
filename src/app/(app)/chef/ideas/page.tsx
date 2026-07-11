@@ -34,6 +34,7 @@ export default async function ChefIdeasPage({ searchParams }: Props) {
       </PageHeader>
       <div style={{ padding: '20px 20px 0' }}>
         <IdeasResults
+          key={q ?? 'none'}
           inventory={context.inventory}
           defaultServings={context.defaultServings}
           query={q}

@@ -206,38 +206,16 @@ export default function ShoppingPage() {
   const manualPending = pending.filter(i => i.reason === 'manual')
 
   async function checkOff(item: ShoppingItem) {
+    // Only mark purchased and save the quantity chosen — inventory isn't
+    // touched here, so unchecking and re-checking never double-adds stock.
+    // The actual stock bump happens once, for everything in "Done", when
+    // "Clear and Update Inventory" is pressed.
     const qty = quantities[item.id] ?? 1
     const supabase = createClient()
-
-    // Mark purchased and save the quantity used
     await supabase.from('shopping_list')
       .update({ status: 'purchased', quantity: qty })
       .eq('id', item.id)
-
-    // Update inventory if this is a tracked item
-    if (item.item_id) {
-      const today = new Date().toISOString().split('T')[0]
-      const { data: invRows } = await supabase
-        .from('inventory')
-        .select('id, quantity')
-        .eq('item_id', item.item_id)
-        .order('quantity', { ascending: false })
-
-      if (invRows && invRows.length > 0) {
-        await supabase.from('inventory').update({
-          quantity: invRows[0].quantity + qty,
-          purchase_date: today,
-          added_by: userId,
-        }).eq('id', invRows[0].id)
-      }
-
-      // Remember this quantity as the new default
-      await supabase.from('items')
-        .update({ default_restock_qty: qty })
-        .eq('id', item.item_id)
-    }
-
-    setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'purchased' } : i))
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'purchased', quantity: qty } : i))
   }
 
   async function uncheck(item: ShoppingItem) {
@@ -256,6 +234,33 @@ export default function ShoppingPage() {
 
   async function clearCompleted() {
     const supabase = createClient()
+    const today = new Date().toISOString().split('T')[0]
+
+    // Apply the stock bump for every "Done" item, once, right before clearing.
+    await Promise.all(purchased.map(async item => {
+      if (!item.item_id) return
+      const qty = quantities[item.id] ?? item.quantity ?? 1
+
+      const { data: invRows } = await supabase
+        .from('inventory')
+        .select('id, quantity')
+        .eq('item_id', item.item_id)
+        .order('quantity', { ascending: false })
+
+      if (invRows && invRows.length > 0) {
+        await supabase.from('inventory').update({
+          quantity: invRows[0].quantity + qty,
+          purchase_date: today,
+          added_by: userId,
+        }).eq('id', invRows[0].id)
+      }
+
+      // Remember this quantity as the new default
+      await supabase.from('items')
+        .update({ default_restock_qty: qty })
+        .eq('id', item.item_id)
+    }))
+
     const ids = purchased.map(i => i.id)
     await supabase.from('shopping_list').update({ status: 'cleared' }).in('id', ids)
     setItems(prev => prev.filter(i => !ids.includes(i.id)))
@@ -421,7 +426,7 @@ export default function ShoppingPage() {
                     fontSize: 11, fontWeight: 700, color: 'var(--amber)',
                   }}
                 >
-                  Clear Done
+                  Clear and Update Inventory
                 </button>
               </div>
               {purchased.map(item => (
@@ -624,43 +629,44 @@ function ItemRow({ item, checked, qty, onUpdateQty, onToggle }: {
         )}
       </div>
 
-      {/* Compact qty stepper — fixed width so all rows align */}
-      {!checked && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0, width: 104 }}>
-          <button
-            type="button"
-            onClick={() => onUpdateQty(-1)}
-            style={{
-              width: 26, height: 26, borderRadius: '8px 0 0 8px',
-              border: '1px solid oklch(100% 0 0 / 0.5)', borderRight: 'none',
-              background: 'lab(99 0.1 1.08)', color: 'var(--foreground)',
-              fontSize: 15, fontWeight: 600, cursor: qty <= 1 ? 'not-allowed' : 'pointer',
-              opacity: qty <= 1 ? 0.3 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >−</button>
-          <div style={{
-            flex: 1, height: 26, padding: '0 4px', overflow: 'hidden',
-            borderTop: '1px solid oklch(100% 0 0 / 0.5)', borderBottom: '1px solid oklch(100% 0 0 / 0.5)',
-            background: 'lab(99 0.1 1.08)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 12, fontWeight: 700, color: 'var(--foreground)', whiteSpace: 'nowrap',
-          }}>
-            {qty}{unit ? ` ${unit}` : ''}
-          </div>
-          <button
-            type="button"
-            onClick={() => onUpdateQty(1)}
-            style={{
-              width: 26, height: 26, borderRadius: '0 8px 8px 0',
-              border: '1px solid oklch(100% 0 0 / 0.5)', borderLeft: 'none',
-              background: 'lab(99 0.1 1.08)', color: 'var(--foreground)',
-              fontSize: 15, fontWeight: 600, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <i className="fi-rr-plus" style={{ fontSize: 11, display: 'block', lineHeight: 1 }} />
-          </button>
+      {/* Compact qty stepper — fixed width so all rows align. Stays visible
+          when checked so it's clear how many units will be added to
+          inventory, and still adjustable right up until "Clear and Update
+          Inventory" is pressed. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0, width: 104 }}>
+        <button
+          type="button"
+          onClick={() => onUpdateQty(-1)}
+          style={{
+            width: 26, height: 26, borderRadius: '8px 0 0 8px',
+            border: '1px solid oklch(100% 0 0 / 0.5)', borderRight: 'none',
+            background: 'lab(99 0.1 1.08)', color: 'var(--foreground)',
+            fontSize: 15, fontWeight: 600, cursor: qty <= 1 ? 'not-allowed' : 'pointer',
+            opacity: qty <= 1 ? 0.3 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >−</button>
+        <div style={{
+          flex: 1, height: 26, padding: '0 4px', overflow: 'hidden',
+          borderTop: '1px solid oklch(100% 0 0 / 0.5)', borderBottom: '1px solid oklch(100% 0 0 / 0.5)',
+          background: 'lab(99 0.1 1.08)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 12, fontWeight: 700, color: 'var(--foreground)', whiteSpace: 'nowrap',
+        }}>
+          {qty}{unit ? ` ${unit}` : ''}
         </div>
-      )}
+        <button
+          type="button"
+          onClick={() => onUpdateQty(1)}
+          style={{
+            width: 26, height: 26, borderRadius: '0 8px 8px 0',
+            border: '1px solid oklch(100% 0 0 / 0.5)', borderLeft: 'none',
+            background: 'lab(99 0.1 1.08)', color: 'var(--foreground)',
+            fontSize: 15, fontWeight: 600, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <i className="fi-rr-plus" style={{ fontSize: 11, display: 'block', lineHeight: 1 }} />
+        </button>
+      </div>
     </div>
   )
 }

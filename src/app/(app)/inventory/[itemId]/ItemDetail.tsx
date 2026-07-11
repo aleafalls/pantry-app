@@ -133,10 +133,14 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
       setRows(rows.map(r => r.id === primaryRow.id ? { ...r, quantity: adjustedQty } : r))
     }
 
-    // Resolve any pending shopping list entry now that stock is updated
-    await supabase.from('shopping_list')
-      .update({ status: 'purchased', completed_at: new Date().toISOString() })
-      .eq('item_id', item.id).eq('status', 'pending')
+    // Resolve any pending shopping list entry — but only on a genuine
+    // restock (increase). Decreasing stock (using it up) shouldn't mark
+    // an unrelated pending "running low" entry as purchased.
+    if (isIncrease) {
+      await supabase.from('shopping_list')
+        .update({ status: 'purchased', completed_at: new Date().toISOString() })
+        .eq('item_id', item.id).eq('status', 'pending')
+    }
 
     setJustUpdated(true)
     setUpdating(false)

@@ -34,6 +34,8 @@ export default async function ChefPage() {
           inventory={context.inventory}
           priorityItems={context.priorityItems}
           defaultServings={context.defaultServings}
+          householdId={profile.household_id}
+          userId={user.id}
         />
         <RecipeIdeasPreview />
         <SavedRecipesPreview />

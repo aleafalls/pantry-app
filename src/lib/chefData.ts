@@ -1,10 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export interface InventoryItem {
+  id: string
+  itemId: string
   name: string
   quantity: number
   unit: string
   category: string
+  location: string
 }
 
 export interface ChefContext {
@@ -23,7 +26,7 @@ export async function getChefContext(supabase: SupabaseClient, householdId: stri
   const [{ data: inventoryRows }, { data: household }] = await Promise.all([
     supabase
       .from('inventory')
-      .select('quantity, unit, purchase_date, items!inner(name, category, active)')
+      .select('id, item_id, quantity, unit, location, purchase_date, items!inner(name, category, active)')
       .eq('household_id', householdId)
       .eq('items.active', true),
     supabase
@@ -34,15 +37,18 @@ export async function getChefContext(supabase: SupabaseClient, householdId: stri
   ])
 
   const rows = (inventoryRows ?? []) as unknown as {
-    quantity: number; unit: string; purchase_date: string | null
+    id: string; item_id: string; quantity: number; unit: string; location: string; purchase_date: string | null
     items: { name: string; category: string }
   }[]
 
   const inventory: InventoryItem[] = rows.map(r => ({
+    id: r.id,
+    itemId: r.item_id,
     name: r.items.name,
     quantity: r.quantity,
     unit: r.unit,
     category: r.items.category,
+    location: r.location,
   }))
 
   const oldest = [...rows]

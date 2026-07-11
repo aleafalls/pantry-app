@@ -47,3 +47,21 @@ export function matchPercent(ingredients: RecipeIdeaIngredient[]): number {
   const have = ingredients.filter(i => i.have_on_hand).length
   return Math.round((have / ingredients.length) * 100)
 }
+
+interface CachedRecipeIdeas {
+  query: string
+  suggestions: RecipeIdea[]
+}
+
+// Module-level so it survives Next.js client-side navigation — remembers
+// only the most recent Ideas search, so leaving the tab and coming back
+// restores what was already generated instead of starting over.
+let lastIdeas: CachedRecipeIdeas | null = null
+
+export function getCachedRecipeIdeas(): CachedRecipeIdeas | null {
+  return lastIdeas
+}
+
+export function setCachedRecipeIdeas(query: string, suggestions: RecipeIdea[]) {
+  lastIdeas = { query, suggestions }
+}

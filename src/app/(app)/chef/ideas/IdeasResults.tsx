@@ -1,8 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import type { InventoryItem } from '@/lib/chefData'
-import { fetchRecipeIdeas, matchPercent, type RecipeIdea } from '@/lib/recipeIdeas'
+import { fetchRecipeIdeas, getCachedRecipeIdeas, matchPercent, setCachedRecipeIdeas, type RecipeIdea } from '@/lib/recipeIdeas'
+import { getRandomPrompts } from '@/lib/recipePrompts'
+import AiLoadingCard from '@/components/chef/AiLoadingCard'
+import RecipeIdeaSearchBox from '@/components/chef/RecipeIdeaSearchBox'
 
 interface Props {
   inventory: InventoryItem[]
@@ -19,35 +23,69 @@ const glassCard: React.CSSProperties = {
 }
 
 export default function IdeasResults({ inventory, defaultServings, query }: Props) {
+  const router = useRouter()
+  const [inputValue, setInputValue] = useState(query ?? '')
+  const [starterPrompts, setStarterPrompts] = useState<string[]>([])
+  const [activeQuery, setActiveQuery] = useState(query)
   const [suggestions, setSuggestions] = useState<RecipeIdea[] | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(false)
 
-  function load() {
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: randomize client-side only to avoid a server/client hydration mismatch
+    setStarterPrompts(getRandomPrompts(5))
+  }, [])
+
+  function load(q: string) {
     setLoading(true)
     setError(false)
-    fetchRecipeIdeas({ inventory, defaultServings, query })
+    setSuggestions(null)
+    fetchRecipeIdeas({ inventory, defaultServings, query: q })
       .then(data => {
-        if (data) setSuggestions(data)
-        else setError(true)
+        if (data) {
+          setSuggestions(data)
+          setCachedRecipeIdeas(q, data)
+        } else setError(true)
       })
       .catch(() => setError(true))
       .finally(() => setLoading(false))
   }
 
   useEffect(() => {
-    if (inventory.length === 0) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: (re)fetch whenever the query changes
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-fetch only on query change, not inventory/defaultServings identity
-  }, [query])
+    if (query) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: (re)fetch whenever the query changes
+      if (inventory.length > 0) load(query)
+    } else {
+      // No query in the URL — restore the last search from this session
+      // (if any) instead of dropping back to the blank starter state.
+      const cached = getCachedRecipeIdeas()
+      if (cached) {
+        setActiveQuery(cached.query)
+        setSuggestions(cached.suggestions)
+        setInputValue(cached.query)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per mount; this component remounts (see `key` in page.tsx) whenever the URL query changes
+  }, [])
+
+  function goToQuery(q: string) {
+    const trimmed = q.trim()
+    router.push(trimmed ? `/chef/ideas?q=${encodeURIComponent(trimmed)}` : '/chef/ideas')
+  }
 
   function handleGetMore() {
+    if (!activeQuery) return
     setLoadingMore(true)
-    fetchRecipeIdeas({ inventory, defaultServings, query })
+    fetchRecipeIdeas({ inventory, defaultServings, query: activeQuery })
       .then(data => {
-        if (data) setSuggestions(prev => (prev ? [...prev, ...data] : data))
+        if (data) {
+          setSuggestions(prev => {
+            const next = prev ? [...prev, ...data] : data
+            setCachedRecipeIdeas(activeQuery, next)
+            return next
+          })
+        }
       })
       .finally(() => setLoadingMore(false))
   }
@@ -63,11 +101,49 @@ export default function IdeasResults({ inventory, defaultServings, query }: Prop
         </div>
       )}
 
+      {inventory.length > 0 && (
+        <>
+          <RecipeIdeaSearchBox
+            value={inputValue}
+            onChange={setInputValue}
+            onSubmit={() => goToQuery(inputValue)}
+            instructionText={'Search for recipes with specific ingredients as inspo, a concept like "vegetarian pasta" or "instant pot meal", or tap a starting point below.'}
+          />
+
+          {!activeQuery && !loading && starterPrompts.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
+                Need inspiration?
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {starterPrompts.map(prompt => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => goToQuery(prompt)}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 7,
+                      padding: '9px 18px', borderRadius: 99,
+                      background: 'var(--glass-card)',
+                      backdropFilter: 'blur(14px) saturate(180%)',
+                      WebkitBackdropFilter: 'blur(14px) saturate(180%)',
+                      border: '1px solid oklch(100% 0 0 / 0.6)',
+                      boxShadow: 'oklch(1 0 0 / 0.7) 0px 0px 0px inset, oklch(0.3 0.02 85 / 0.25) 0px 4px 14px -8px',
+                      fontSize: 14, fontWeight: 600, color: 'var(--foreground)',
+                      whiteSpace: 'nowrap', cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
       {inventory.length > 0 && loading && (
-        <div className="rounded-14 px-4 py-8 flex flex-col items-center gap-2 text-center" style={{ background: 'var(--surface)' }}>
-          <i className="fi-sr-sparkles" style={{ fontSize: 22, color: 'var(--amber)', animation: 'spin 1s linear infinite' }} />
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>Finding recipes{query ? ` for "${query}"` : ''}…</p>
-        </div>
+        <AiLoadingCard label={`Finding recipes${activeQuery ? ` for "${activeQuery}"` : ''}…`} />
       )}
 
       {!loading && error && (

@@ -2,14 +2,17 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { InventoryItem } from '@/lib/chefData'
-import { getOrFetchTonightSuggestions, refetchTonightSuggestions, type Suggestion } from '@/lib/chefSuggestions'
+import { getCachedTonightSuggestions, getOrFetchTonightSuggestions, refetchTonightSuggestions, type Suggestion } from '@/lib/chefSuggestions'
 import { getIngredientChipColors } from '@/lib/chipColors'
+import SuggestionDetailSheet from '@/components/chef/SuggestionDetailSheet'
 
 interface Props {
   inventory: InventoryItem[]
   priorityItems: string[]
   defaultServings: number
   strictOnly: boolean
+  householdId: string
+  userId: string
 }
 
 const glassCard: React.CSSProperties = {
@@ -20,24 +23,25 @@ const glassCard: React.CSSProperties = {
   boxShadow: 'oklch(1 0 0 / 0.7) 0px 0px 0px inset, oklch(0.3 0.02 85 / 0.25) 0px 4px 14px -8px',
 }
 
-export default function TonightResults({ inventory, priorityItems, defaultServings, strictOnly }: Props) {
+export default function TonightResults({ inventory, priorityItems, defaultServings, strictOnly, householdId, userId }: Props) {
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(false)
+  const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null)
   const isFirstLoad = useRef(true)
 
-  function loadSuggestions(allowShoppingValue: boolean, fresh: boolean) {
-    setLoading(true)
+  function loadSuggestions(allowShoppingValue: boolean, fresh: boolean, hasCached: boolean) {
+    if (!hasCached) setLoading(true)
     setError(false)
     const params = { inventory, priorityItems, defaultServings, allowShopping: allowShoppingValue }
     const promise = fresh ? refetchTonightSuggestions(params) : getOrFetchTonightSuggestions(params)
     promise
       .then(data => {
         if (data) setSuggestions(data)
-        else setError(true)
+        else if (!hasCached) setError(true)
       })
-      .catch(() => setError(true))
+      .catch(() => { if (!hasCached) setError(true) })
       .finally(() => setLoading(false))
   }
 
@@ -55,10 +59,24 @@ export default function TonightResults({ inventory, priorityItems, defaultServin
     if (inventory.length === 0) return
     // First mount reads the Dashboard's prewarmed result (if any); every
     // later run of this effect is a toggle change, so it forces a fresh call.
-    const fresh = !isFirstLoad.current
+    const wasFirstLoad = isFirstLoad.current
+    const fresh = !wasFirstLoad
     isFirstLoad.current = false
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: re-fetch whenever the toggle changes
-    loadSuggestions(!strictOnly, fresh)
+
+    // On a page revisit (first mount of this instance), render the
+    // last-resolved suggestions immediately instead of flashing the
+    // loading state while the cache is re-read.
+    let hasCached = false
+    if (wasFirstLoad) {
+      const cached = getCachedTonightSuggestions(!strictOnly)
+      if (cached) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: restore the last-resolved suggestions on mount
+        setSuggestions(cached)
+        hasCached = true
+      }
+    }
+
+    loadSuggestions(!strictOnly, fresh, hasCached)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-fetch only on toggle change, not on inventory/priorityItems/defaultServings identity
   }, [strictOnly])
 
@@ -81,7 +99,12 @@ export default function TonightResults({ inventory, priorityItems, defaultServin
           {suggestions.map((s, i) => {
             const chipColors = getIngredientChipColors(s.ingredients_used)
             return (
-              <div key={i} className="rounded-14 p-4 flex flex-col gap-2" style={glassCard}>
+              <div
+                key={i}
+                onClick={() => setSelectedSuggestion(s)}
+                className="rounded-14 p-4 flex flex-col gap-2"
+                style={{ ...glassCard, cursor: 'pointer' }}
+              >
                 <span className="text-base font-bold" style={{ color: 'var(--foreground)' }}>{s.idea}</span>
                 <span className="text-sm" style={{ color: 'var(--muted)' }}>{s.description}</span>
 
@@ -138,6 +161,14 @@ export default function TonightResults({ inventory, priorityItems, defaultServin
           </button>
         </div>
       )}
+
+      <SuggestionDetailSheet
+        suggestion={selectedSuggestion}
+        onOpenChange={open => !open && setSelectedSuggestion(null)}
+        inventory={inventory}
+        householdId={householdId}
+        userId={userId}
+      />
     </div>
   )
 }

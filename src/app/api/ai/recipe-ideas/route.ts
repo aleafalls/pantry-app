@@ -88,7 +88,7 @@ ${finalLine}`
 
   try {
     const response = await client.messages.parse({
-      model: 'claude-opus-4-8',
+      model: 'claude-sonnet-5',
       max_tokens: 4096,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],

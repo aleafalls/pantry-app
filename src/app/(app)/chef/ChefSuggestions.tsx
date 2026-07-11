@@ -3,13 +3,17 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { InventoryItem } from '@/lib/chefData'
-import { getOrFetchTonightSuggestions, type Suggestion } from '@/lib/chefSuggestions'
+import { getCachedTonightSuggestions, getOrFetchTonightSuggestions, type Suggestion } from '@/lib/chefSuggestions'
 import { getIngredientChipColors } from '@/lib/chipColors'
+import SuggestionDetailSheet from '@/components/chef/SuggestionDetailSheet'
+import AiLoadingCard from '@/components/chef/AiLoadingCard'
 
 interface Props {
   inventory: InventoryItem[]
   priorityItems: string[]
   defaultServings: number
+  householdId: string
+  userId: string
 }
 
 const glassCard: React.CSSProperties = {
@@ -20,21 +24,28 @@ const glassCard: React.CSSProperties = {
   boxShadow: 'oklch(1 0 0 / 0.7) 0px 0px 0px inset, oklch(0.3 0.02 85 / 0.25) 0px 4px 14px -8px',
 }
 
-export default function ChefSuggestions({ inventory, priorityItems, defaultServings }: Props) {
+export default function ChefSuggestions({ inventory, priorityItems, defaultServings, householdId, userId }: Props) {
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null)
   const [error, setError] = useState(false)
+  const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null)
 
   useEffect(() => {
     if (inventory.length === 0) return
+
+    // Render the last-resolved result immediately, if any, so revisiting
+    // this tab doesn't flash the loading state while the cache is re-read.
+    const cached = getCachedTonightSuggestions(false)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: restore the last-resolved suggestions on mount
+    if (cached) setSuggestions(cached)
 
     let cancelled = false
     getOrFetchTonightSuggestions({ inventory, priorityItems, defaultServings, allowShopping: false })
       .then(data => {
         if (cancelled) return
         if (data) setSuggestions(data)
-        else setError(true)
+        else if (!cached) setError(true)
       })
-      .catch(() => { if (!cancelled) setError(true) })
+      .catch(() => { if (!cancelled && !cached) setError(true) })
 
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once on mount; inventory/priorityItems/defaultServings come from the server-rendered page and don't change during this component's lifetime
@@ -60,9 +71,7 @@ export default function ChefSuggestions({ inventory, priorityItems, defaultServi
       )}
 
       {inventory.length > 0 && !suggestions && !error && (
-        <div className="rounded-14 px-4 py-5 text-center" style={{ background: 'var(--surface)' }}>
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>Finding ideas from what you have…</p>
-        </div>
+        <AiLoadingCard label="Finding ideas from what you have…" />
       )}
 
       {error && (
@@ -76,7 +85,12 @@ export default function ChefSuggestions({ inventory, priorityItems, defaultServi
           {suggestions.slice(0, 2).map((s, i) => {
             const chipColors = getIngredientChipColors(s.ingredients_used)
             return (
-              <div key={i} className="flex items-center gap-3 rounded-14 p-3" style={glassCard}>
+              <div
+                key={i}
+                onClick={() => setSelectedSuggestion(s)}
+                className="flex items-center gap-3 rounded-14 p-3"
+                style={{ ...glassCard, cursor: 'pointer' }}
+              >
                 <div className="flex flex-col gap-1.5" style={{ flex: 1, minWidth: 0 }}>
                   <span className="text-13 font-bold" style={{ color: 'var(--foreground)' }}>{s.idea}</span>
                   <div className="flex flex-wrap gap-1.5">
@@ -94,6 +108,14 @@ export default function ChefSuggestions({ inventory, priorityItems, defaultServi
           })}
         </div>
       )}
+
+      <SuggestionDetailSheet
+        suggestion={selectedSuggestion}
+        onOpenChange={open => !open && setSelectedSuggestion(null)}
+        inventory={inventory}
+        householdId={householdId}
+        userId={userId}
+      />
     </div>
   )
 }

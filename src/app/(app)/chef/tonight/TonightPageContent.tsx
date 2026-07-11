@@ -11,9 +11,11 @@ interface Props {
   inventory: InventoryItem[]
   priorityItems: string[]
   defaultServings: number
+  householdId: string
+  userId: string
 }
 
-export default function TonightPageContent({ inventory, priorityItems, defaultServings }: Props) {
+export default function TonightPageContent({ inventory, priorityItems, defaultServings, householdId, userId }: Props) {
   const [strictOnly, setStrictOnly] = useState(true)
 
   return (
@@ -28,6 +30,8 @@ export default function TonightPageContent({ inventory, priorityItems, defaultSe
           priorityItems={priorityItems}
           defaultServings={defaultServings}
           strictOnly={strictOnly}
+          householdId={householdId}
+          userId={userId}
         />
       </div>
     </>

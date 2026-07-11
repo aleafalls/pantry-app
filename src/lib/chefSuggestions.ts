@@ -25,8 +25,17 @@ export interface TonightParams {
 // tab or the Tonight page without duplicating the call.
 const cache = new Map<string, Promise<Suggestion[] | null>>()
 
+// Separately remembers the last *resolved* suggestions per mode so a page
+// revisit can render them immediately (no loading flash) instead of
+// waiting on the promise cache above to resolve again.
+const resolvedCache = new Map<string, Suggestion[]>()
+
 function cacheKey(allowShopping: boolean) {
   return allowShopping ? 'shopping' : 'strict'
+}
+
+export function getCachedTonightSuggestions(allowShopping: boolean): Suggestion[] | null {
+  return resolvedCache.get(cacheKey(allowShopping)) ?? null
 }
 
 async function requestSuggestions(params: TonightParams): Promise<Suggestion[] | null> {
@@ -43,7 +52,9 @@ async function requestSuggestions(params: TonightParams): Promise<Suggestion[] |
     })
     if (!res.ok) return null
     const data = await res.json()
-    return data.suggestions ?? null
+    const suggestions: Suggestion[] | null = data.suggestions ?? null
+    if (suggestions) resolvedCache.set(cacheKey(params.allowShopping), suggestions)
+    return suggestions
   } catch {
     return null
   }

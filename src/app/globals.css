@@ -113,6 +113,24 @@ select:focus-visible {
   to   { transform: rotate(360deg); }
 }
 
+/* Subtle animated gradient for AI "thinking" loading cards */
+@keyframes ai-card-gradient {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* Relay of food emojis crossing an AI loading card, one after another,
+   fading + blurring out as each reaches the edges. Assumes 5 emojis
+   staggered at 1/5 of the total animation-duration apart. */
+@keyframes food-emoji-relay {
+  0%   { left: -8%;  opacity: 0; filter: blur(6px); }
+  4%   { opacity: 1; filter: blur(0); }
+  14%  { left: 92%;  opacity: 1; filter: blur(0); }
+  20%  { left: 108%; opacity: 0; filter: blur(6px); }
+  100% { left: 108%; opacity: 0; filter: blur(6px); }
+}
+
 /* Floating animations for auth page emoji cards */
 @keyframes float-1 {
   0%, 100% { transform: translate(0px, 0px); }
