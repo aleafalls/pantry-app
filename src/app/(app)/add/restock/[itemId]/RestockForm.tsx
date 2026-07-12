@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/layout/PageHeader'
 import AppBackground from '@/components/layout/AppBackground'
 import { Button } from '@/components/ui/button'
 import QuantityStepper from '@/components/add/QuantityStepper'
 import LocationSelector from '@/components/add/LocationSelector'
-import SuccessScreen from '@/components/add/SuccessScreen'
 import { LOCATIONS } from '@/lib/constants'
 
 const LOCATION_LABELS: Record<string, string> = Object.fromEntries(LOCATIONS.map(l => [l.value, l.label]))
@@ -35,6 +36,7 @@ interface Props {
 }
 
 export default function RestockForm({ item, inventoryRows, userId }: Props) {
+  const router = useRouter()
   const defaultLocation = inventoryRows.length > 0
     ? inventoryRows.reduce((a, b) => a.quantity >= b.quantity ? a : b).location
     : 'pantry'
@@ -42,8 +44,6 @@ export default function RestockForm({ item, inventoryRows, userId }: Props) {
   const [addedQty, setAddedQty] = useState(item.default_restock_qty ?? 1)
   const [location, setLocation] = useState(defaultLocation)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
 
   const currentTotal = inventoryRows.reduce((sum, r) => sum + r.quantity, 0)
   const newTotal = currentTotal + addedQty
@@ -52,57 +52,63 @@ export default function RestockForm({ item, inventoryRows, userId }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    setError('')
 
     const supabase = createClient()
     const today = new Date().toISOString().split('T')[0]
     const existingRow = inventoryRows.find(r => r.location === location)
 
-    let err
-    if (existingRow) {
-      const { error } = await supabase.from('inventory').update({
-        quantity: existingRow.quantity + addedQty,
-        purchase_date: today,
-        added_by: userId,
-      }).eq('id', existingRow.id)
-      err = error
-    } else {
-      const { error } = await supabase.from('inventory').insert({
-        household_id: item.household_id,
-        item_id: item.id,
-        location,
-        quantity: addedQty,
-        unit,
-        purchase_date: today,
-        added_by: userId,
-      })
-      err = error
+    const savePromise = (async () => {
+      let err
+      if (existingRow) {
+        const { error } = await supabase.from('inventory').update({
+          quantity: existingRow.quantity + addedQty,
+          purchase_date: today,
+          added_by: userId,
+        }).eq('id', existingRow.id)
+        err = error
+      } else {
+        const { error } = await supabase.from('inventory').insert({
+          household_id: item.household_id,
+          item_id: item.id,
+          location,
+          quantity: addedQty,
+          unit,
+          purchase_date: today,
+          added_by: userId,
+        })
+        err = error
+      }
+
+      if (err) throw new Error(err.message)
+
+      // Remember qty for next restock
+      await supabase.from('items').update({ default_restock_qty: addedQty }).eq('id', item.id)
+
+      // Resolve any pending shopping list entry
+      await supabase.from('shopping_list')
+        .update({ status: 'purchased', completed_at: new Date().toISOString() })
+        .eq('item_id', item.id)
+        .eq('status', 'pending')
+    })()
+
+    toast.promise(savePromise, {
+      loading: `Adding ${item.name}…`,
+      success: () => ({
+        message: `${item.name} added!`,
+        description: `You now have ${newTotal} ${unit} total`,
+        action: { label: 'View item', onClick: () => router.push(`/inventory/${item.id}`) },
+      }),
+      error: (err) => err instanceof Error ? err.message : 'Something went wrong',
+    })
+
+    try {
+      await savePromise
+      router.push('/add')
+    } catch {
+      // already surfaced via toast.promise's error handler
+    } finally {
+      setLoading(false)
     }
-
-    if (err) { setError(err.message); setLoading(false); return }
-
-    // Remember qty for next restock
-    await supabase.from('items').update({ default_restock_qty: addedQty }).eq('id', item.id)
-
-    // Resolve any pending shopping list entry
-    await supabase.from('shopping_list')
-      .update({ status: 'purchased', completed_at: new Date().toISOString() })
-      .eq('item_id', item.id)
-      .eq('status', 'pending')
-
-    setSuccess(true)
-    setLoading(false)
-  }
-
-  if (success) {
-    return (
-      <AppBackground>
-        <SuccessScreen
-          itemName={item.name}
-          detail={`You now have ${newTotal} ${unit} total`}
-        />
-      </AppBackground>
-    )
   }
 
   return (
@@ -154,8 +160,6 @@ export default function RestockForm({ item, inventoryRows, userId }: Props) {
             <strong>{newTotal} {unit}</strong> total
           </p>
         </div>
-
-        {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
 
         <Button type="submit" variant="brand" disabled={loading}
           style={{ background: 'linear-gradient(150deg, var(--yellow-light), var(--yellow))', color: '#4A3300', padding: '14px 16px', marginTop: 8 }}>

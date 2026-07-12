@@ -48,6 +48,7 @@ interface CatalogItem {
   default_unit: string
   category: string
   default_location: string
+  tags: string[]
 }
 
 export default function InventoryPage() {
@@ -139,7 +140,7 @@ export default function InventoryPage() {
       const supabase = createClient()
       const { data: catalog } = await supabase
         .from('catalog')
-        .select('id, name, emoji, default_unit, category, default_location')
+        .select('id, name, emoji, default_unit, category, default_location, tags')
         .ilike('name', `%${query.trim()}%`)
         .order('name')
         .limit(20)
@@ -287,7 +288,18 @@ export default function InventoryPage() {
                   {catalogItems.map(item => (
                     <button
                       key={item.id}
-                      onClick={() => router.push(`/add/restock?catalogId=${item.id}`)}
+                      onClick={() => {
+                        const params = new URLSearchParams({
+                          catalogId: item.id,
+                          name: item.name,
+                          category: item.category,
+                          unit: item.default_unit,
+                          location: item.default_location,
+                        })
+                        if (item.emoji) params.set('emoji', item.emoji)
+                        if (item.tags?.length) params.set('tags', item.tags.join(','))
+                        router.push(`/add/new?${params.toString()}`)
+                      }}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 12,
                         width: '100%', padding: '12px 20px',

@@ -37,6 +37,7 @@ Before writing any UI, check if a shared component already exists. **Use shared 
 | `Select` + friends | Dropdowns. Background fixed via inline style in `select.tsx` — don't change. |
 | `Badge` | Status tags, counts, source labels. |
 | `Sheet` | Bottom-sheet drawers. |
+| `Sonner` (`Toaster`) | `src/components/ui/sonner.tsx` | Non-blocking confirmations (e.g. post-save toasts). Mounted once in root `layout.tsx`; call `toast()` / `toast.promise()` from `sonner` anywhere. |
 
 ### Custom shared components
 | Component | Path | Use for |
@@ -46,7 +47,6 @@ Before writing any UI, check if a shared component already exists. **Use shared 
 | `QuantityStepper` | `src/components/add/QuantityStepper.tsx` | Any +/− quantity input. |
 | `LocationSelector` | `src/components/add/LocationSelector.tsx` | Location pill picker. |
 | `TagInput` | `src/components/add/TagInput.tsx` | Pill-style tag entry. |
-| `SuccessScreen` | `src/components/add/SuccessScreen.tsx` | Post-save confirmation. |
 
 ---
 
@@ -161,7 +161,7 @@ await supabase.from('table').insert({ id, ...fields })
 ```
 
 ### Catalog copy rule
-Catalog items are copied to household `items` only when the user **completes** the restock form — never on tap. Early copy creates orphaned items with no inventory.
+Catalog items are copied to household `items` only when the user **completes** the New Item form — never on tap. Tapping a catalog result opens `/add/new` prefilled with the catalog's category/unit/location/emoji/tags (all still editable); early copy creates orphaned items with no inventory.
 
 ---
 
@@ -209,9 +209,8 @@ src/app/
     page.tsx              Dashboard
     add/
       page.tsx            Search
-      new/page.tsx        New item form
+      new/page.tsx        New item form (also handles catalog items, ?catalogId=)
       restock/
-        page.tsx          Catalog restock (?catalogId=)
         [itemId]/         Existing item restock
 ```
 

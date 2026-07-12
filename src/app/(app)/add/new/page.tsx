@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/layout/PageHeader'
 import AppBackground from '@/components/layout/AppBackground'
@@ -13,14 +14,15 @@ import DrawerSelect from '@/components/ui/DrawerSelect'
 import EmojiPicker from '@/components/ui/EmojiPicker'
 import QuantityStepper from '@/components/add/QuantityStepper'
 import TagInput from '@/components/add/TagInput'
-import SuccessScreen from '@/components/add/SuccessScreen'
 import { CATEGORIES, UNITS_GROUPED, LOCATIONS } from '@/lib/constants'
 import { getOrFetchEnrichment, refetchEnrichment, type EnrichmentResult } from '@/lib/enrichment'
 
 function NewItemForm() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const shoppingListId = searchParams.get('shoppingListId')
   const barcode = searchParams.get('barcode')
+  const catalogId = searchParams.get('catalogId')
 
   // ── Identity ──────────────────────────────────────────────
   function toTitleCase(str: string) {
@@ -28,12 +30,12 @@ function NewItemForm() {
   }
 
   const [name, setName] = useState(toTitleCase(searchParams.get('name') ?? ''))
-  const [emoji, setEmoji] = useState('📦')
+  const [emoji, setEmoji] = useState(searchParams.get('emoji') ?? '📦')
 
   // ── Stock ─────────────────────────────────────────────────
   const [quantity, setQuantity] = useState(1)
-  const [unit, setUnit] = useState('each')
-  const [location, setLocation] = useState('pantry')
+  const [unit, setUnit] = useState(searchParams.get('unit') ?? 'each')
+  const [location, setLocation] = useState(searchParams.get('location') ?? 'pantry')
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0])
 
   // ── Details ───────────────────────────────────────────────
@@ -42,7 +44,10 @@ function NewItemForm() {
   const [category, setCategory] = useState(searchParams.get('category') ?? '')
   const [preferredStores, setPreferredStores] = useState<string[]>([])
   const [householdStores, setHouseholdStores] = useState<string[]>([])
-  const [tags, setTags] = useState<string[]>([])
+  const [tags, setTags] = useState<string[]>(() => {
+    const raw = searchParams.get('tags')
+    return raw ? raw.split(',').filter(Boolean) : []
+  })
   const [estimatedPrice, setEstimatedPrice] = useState<number | null>(null)
 
   // ── AI enrichment ─────────────────────────────────────────
@@ -53,8 +58,6 @@ function NewItemForm() {
 
   // ── Meta ──────────────────────────────────────────────────
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
   const [householdId, setHouseholdId] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
 
@@ -90,8 +93,10 @@ function NewItemForm() {
           // Arrived with a name already resolved (barcode scan, or typed +
           // tapped "Create" on the Add page) — enrich automatically. Picks
           // up the prewarmed request from the shared cache if one exists.
+          // Skipped for catalog items — those already arrive with known
+          // category/unit/location/emoji, no guessing needed.
           const initialName = searchParams.get('name')
-          if (initialName?.trim()) {
+          if (initialName?.trim() && !catalogId) {
             setEnriching(true)
             getOrFetchEnrichment({
               name: initialName,
@@ -140,57 +145,68 @@ function NewItemForm() {
     e.preventDefault()
     if (!isValid || !householdId || !userId) return
     setLoading(true)
-    setError('')
 
     const supabase = createClient()
     const itemId = crypto.randomUUID()
+    const trimmedName = name.trim()
 
-    const { error: itemError } = await supabase.from('items').insert({
-      id: itemId,
-      household_id: householdId,
-      name: name.trim(),
-      category,
-      default_unit: unit,
-      low_threshold: lowThreshold,
-      emoji,
-      tags,
-      preferred_stores: preferredStores,
-      auto_shopping_list: autoShoppingList,
-      barcode: barcode || null,
-      estimated_price: estimatedPrice,
-      active: true,
+    const savePromise = (async () => {
+      const { error: itemError } = await supabase.from('items').insert({
+        id: itemId,
+        household_id: householdId,
+        name: trimmedName,
+        category,
+        default_unit: unit,
+        low_threshold: lowThreshold,
+        emoji,
+        tags,
+        preferred_stores: preferredStores,
+        auto_shopping_list: autoShoppingList,
+        barcode: barcode || null,
+        estimated_price: estimatedPrice,
+        catalog_id: catalogId || null,
+        active: true,
+      })
+      if (itemError) throw new Error(itemError.message)
+
+      const { error: invError } = await supabase.from('inventory').insert({
+        household_id: householdId,
+        item_id: itemId,
+        location,
+        quantity,
+        unit,
+        purchase_date: purchaseDate,
+        added_by: userId,
+      })
+      if (invError) throw new Error(invError.message)
+
+      if (shoppingListId) {
+        await supabase.from('shopping_list')
+          .update({ item_id: itemId, item_name: trimmedName })
+          .eq('id', shoppingListId)
+      }
+
+      return itemId
+    })()
+
+    toast.promise(savePromise, {
+      loading: `Adding ${trimmedName}…`,
+      success: (id) => ({
+        message: `${trimmedName} added!`,
+        description: `${quantity} ${unit} added to ${location}`,
+        action: { label: 'View item', onClick: () => router.push(`/inventory/${id}`) },
+      }),
+      error: (err) => err instanceof Error ? err.message : 'Something went wrong',
     })
 
-    if (itemError) { setError(itemError.message); setLoading(false); return }
-
-    const { error: invError } = await supabase.from('inventory').insert({
-      household_id: householdId,
-      item_id: itemId,
-      location,
-      quantity,
-      unit,
-      purchase_date: purchaseDate,
-      added_by: userId,
-    })
-
-    if (invError) { setError(invError.message); setLoading(false); return }
-
-    if (shoppingListId) {
-      await supabase.from('shopping_list')
-        .update({ item_id: itemId, item_name: name.trim() })
-        .eq('id', shoppingListId)
+    try {
+      await savePromise
+      router.push('/add')
+    } catch {
+      // already surfaced via toast.promise's error handler
+    } finally {
+      setLoading(false)
     }
-
-    setSuccess(true)
-    setLoading(false)
-  }
-
-  if (success) {
-    return (
-      <AppBackground>
-        <SuccessScreen itemName={name.trim()} detail={`${quantity} ${unit} added to ${location}`} />
-      </AppBackground>
-    )
   }
 
   // ── Layout helpers (same pattern as ItemDetail) ───────────
@@ -351,8 +367,6 @@ function NewItemForm() {
           </Label>
           <TagInput tags={tags} onChange={setTags} />
         </div>
-
-        {error && <p className="text-sm" style={{ color: 'var(--red)' }}>{error}</p>}
 
         <Button
           type="submit"

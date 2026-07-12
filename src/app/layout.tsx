@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Figtree } from 'next/font/google'
+import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
 const figtree = Figtree({
@@ -43,6 +44,7 @@ export default function RootLayout({
         <div style={{ maxWidth: 660, margin: '0 auto', minHeight: '100vh', position: 'relative' }}>
           {children}
         </div>
+        <Toaster />
       </body>
     </html>
   )
