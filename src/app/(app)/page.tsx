@@ -7,6 +7,7 @@ import AddFirstItemCard from '@/components/dashboard/AddFirstItemCard'
 import RunningLow from '@/components/dashboard/RunningLow'
 import UseTheseUp from '@/components/dashboard/UseTheseUp'
 import ChefPrefetch from '@/components/dashboard/ChefPrefetch'
+import DashboardRefresh from '@/components/dashboard/DashboardRefresh'
 import { getChefContext } from '@/lib/chefData'
 import { aggregateInventoryByItem, isRunningLow } from '@/lib/lowStock'
 import { tracksShelfLife, shelfLifeRatio } from '@/lib/shelfLife'
@@ -120,12 +121,14 @@ export default async function DashboardPage() {
         />
 
         {/* Body — design spec: 14px top, 20px sides, 16px bottom */}
-        <div className="flex flex-col gap-4 px-5 pt-14px pb-4">
-          <StatCards itemCount={itemCount} lowCount={allLowItems.length} estValue={estValue} />
-          {isEmpty ? <AddFirstItemCard /> : <RecipeTeaser />}
-          <RunningLow items={lowItems} totalLowCount={allLowItems.length} />
-          {oldestItems.length > 0 && <UseTheseUp items={oldestItems} />}
-        </div>
+        <DashboardRefresh>
+          <div className="flex flex-col gap-4 px-5 pt-14px pb-4">
+            <StatCards itemCount={itemCount} lowCount={allLowItems.length} estValue={estValue} />
+            {isEmpty ? <AddFirstItemCard /> : <RecipeTeaser />}
+            <RunningLow items={lowItems} totalLowCount={allLowItems.length} />
+            {oldestItems.length > 0 && <UseTheseUp items={oldestItems} />}
+          </div>
+        </DashboardRefresh>
       </div>
     </div>
   )

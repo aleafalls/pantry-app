@@ -4,6 +4,7 @@ import { useState } from 'react'
 import PageHeader from '@/components/layout/PageHeader'
 import ChefTabs from './ChefTabs'
 import ChefAddMenu from './ChefAddMenu'
+import ChefSwipeableBody from './ChefSwipeableBody'
 import { Input } from '@/components/ui/input'
 import RecipeCard, { type RecipeCardData } from './RecipeCard'
 import SavedRecipesFilterBar from './SavedRecipesFilterBar'
@@ -86,22 +87,24 @@ export default function SavedRecipesGrid({ recipes }: Props) {
         />
       </PageHeader>
 
-      <div style={{ padding: '20px 20px 0' }}>
-        {filtered.length === 0 ? (
-          <div style={{ padding: '40px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-            <div style={{ fontSize: 40 }}>{hasActiveFilters ? '🔍' : '📖'}</div>
-            <p className="text-sm" style={{ color: 'var(--muted)' }}>
-              {hasActiveFilters ? 'No recipes match your search or filters' : 'No saved recipes yet'}
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-3">
-            {filtered.map(recipe => (
-              <RecipeCard key={recipe.id} {...recipe} />
-            ))}
-          </div>
-        )}
-      </div>
+      <ChefSwipeableBody>
+        <div style={{ padding: '20px 20px 0' }}>
+          {filtered.length === 0 ? (
+            <div style={{ padding: '40px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+              <div style={{ fontSize: 40 }}>{hasActiveFilters ? '🔍' : '📖'}</div>
+              <p className="text-sm" style={{ color: 'var(--muted)' }}>
+                {hasActiveFilters ? 'No recipes match your search or filters' : 'No saved recipes yet'}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {filtered.map(recipe => (
+                <RecipeCard key={recipe.id} {...recipe} />
+              ))}
+            </div>
+          )}
+        </div>
+      </ChefSwipeableBody>
     </>
   )
 }

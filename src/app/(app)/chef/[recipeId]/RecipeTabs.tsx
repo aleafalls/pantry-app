@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import PageHeader from '@/components/layout/PageHeader'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { useSwipeableTabs } from '@/hooks/useSwipeableTabs'
 import type { InventoryItem } from '@/lib/chefData'
 import CookView from './CookView'
 import PlanView from './PlanView'
@@ -42,6 +43,8 @@ const TABS = [
 
 export default function RecipeTabs({ recipe, ingredients, inventory, householdId, userId }: Props) {
   const [tab, setTab] = useState('cook')
+  const activeIndex = TABS.findIndex(t => t.value === tab)
+  const bind = useSwipeableTabs(activeIndex, TABS.length, index => setTab(TABS[index].value))
 
   return (
     <>
@@ -76,7 +79,7 @@ export default function RecipeTabs({ recipe, ingredients, inventory, householdId
         </Tabs>
       </PageHeader>
 
-      <div style={{ padding: '20px 20px 0' }}>
+      <div {...bind()} style={{ padding: '20px 20px 0' }}>
         {tab === 'cook' && <CookView recipe={recipe} ingredients={ingredients} />}
         {tab === 'plan' && (
           <PlanView

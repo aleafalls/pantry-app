@@ -9,6 +9,7 @@ import InventoryFilterBar from '@/components/inventory/InventoryFilterBar'
 import InventoryItemRow from '@/components/inventory/InventoryItemRow'
 import { LOCATIONS } from '@/lib/constants'
 import AppBackground from '@/components/layout/AppBackground'
+import PullToRefresh from '@/components/ui/PullToRefresh'
 
 interface AggregatedItem {
   itemId: string
@@ -73,58 +74,62 @@ export default function InventoryPage() {
     })
   }, [])
 
-  useEffect(() => {
-    if (!householdId) return
+  async function loadInventory(hid: string) {
     const supabase = createClient()
-    supabase
+    const { data } = await supabase
       .from('inventory')
       .select(`
         id, quantity, unit, location, manual_low_flag,
         items!inner(id, name, emoji, category, low_threshold, active, tags)
       `)
-      .eq('household_id', householdId)
+      .eq('household_id', hid)
       .eq('items.active', true)
-      .then(({ data }) => {
-        if (!data) { setLoading(false); return }
 
-        // Aggregate by item_id
-        const map = new Map<string, AggregatedItem>()
-        for (const row of data as unknown as InventoryRow[]) {
-          const item = row.items
-          const existing = map.get(item.id)
-          if (existing) {
-            existing.totalQty += row.quantity
-            if (!existing.locations.includes(row.location)) {
-              existing.locations.push(row.location)
-            }
-            if (row.manual_low_flag) existing.isLow = true
-          } else {
-            map.set(item.id, {
-              itemId: item.id,
-              name: item.name,
-              emoji: item.emoji,
-              category: item.category,
-              unit: row.unit,
-              tags: item.tags ?? [],
-              totalQty: row.quantity,
-              locations: [row.location],
-              primaryLocation: row.location,
-              isLow: row.manual_low_flag,
-              isCritical: false,
-            })
-          }
+    if (!data) { setLoading(false); return }
+
+    // Aggregate by item_id
+    const map = new Map<string, AggregatedItem>()
+    for (const row of data as unknown as InventoryRow[]) {
+      const item = row.items
+      const existing = map.get(item.id)
+      if (existing) {
+        existing.totalQty += row.quantity
+        if (!existing.locations.includes(row.location)) {
+          existing.locations.push(row.location)
         }
+        if (row.manual_low_flag) existing.isLow = true
+      } else {
+        map.set(item.id, {
+          itemId: item.id,
+          name: item.name,
+          emoji: item.emoji,
+          category: item.category,
+          unit: row.unit,
+          tags: item.tags ?? [],
+          totalQty: row.quantity,
+          locations: [row.location],
+          primaryLocation: row.location,
+          isLow: row.manual_low_flag,
+          isCritical: false,
+        })
+      }
+    }
 
-        // Compute low/critical after full aggregation
-        for (const [, agg] of map) {
-          const threshold = (data as unknown as InventoryRow[]).find(r => r.items.id === agg.itemId)?.items.low_threshold ?? 2
-          if (agg.totalQty === 0) agg.isCritical = true
-          else if (agg.totalQty <= threshold) agg.isLow = true
-        }
+    // Compute low/critical after full aggregation
+    for (const [, agg] of map) {
+      const threshold = (data as unknown as InventoryRow[]).find(r => r.items.id === agg.itemId)?.items.low_threshold ?? 2
+      if (agg.totalQty === 0) agg.isCritical = true
+      else if (agg.totalQty <= threshold) agg.isLow = true
+    }
 
-        setAllItems(Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name)))
-        setLoading(false)
-      })
+    setAllItems(Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name)))
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    if (!householdId) return
+    loadInventory(householdId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadInventory is stable enough for this purpose; re-run only on householdId change
   }, [householdId])
 
   // Debounced catalog search — supplements the local pantry filter above with
@@ -232,6 +237,7 @@ export default function InventoryPage() {
       </div>
 
       {/* Content */}
+      <PullToRefresh onRefresh={() => householdId ? loadInventory(householdId) : Promise.resolve()}>
       {loading ? (
         <div style={{ padding: '40px 20px', textAlign: 'center' }}>
           <p className="text-sm" style={{ color: 'var(--muted)' }}>Loading…</p>
@@ -353,6 +359,7 @@ export default function InventoryPage() {
           )}
         </>
       )}
+      </PullToRefresh>
     </AppBackground>
   )
 }

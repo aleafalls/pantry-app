@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-const TABS = [
+export const TABS = [
   { value: 'all', label: 'All', href: '/chef' },
   { value: 'tonight', label: 'Tonight', href: '/chef/tonight' },
   { value: 'ideas', label: 'Ideas', href: '/chef/ideas' },

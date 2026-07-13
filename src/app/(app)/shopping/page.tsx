@@ -2,10 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import PageHeader from '@/components/layout/PageHeader'
 import AppBackground from '@/components/layout/AppBackground'
+import SwipeToDeleteRow from '@/components/ui/SwipeToDeleteRow'
+import PullToRefresh from '@/components/ui/PullToRefresh'
 import { aggregateInventoryByItem, isRunningLow, type LowStockInventoryRow } from '@/lib/lowStock'
 
 interface ShoppingItem {
@@ -219,6 +222,24 @@ export default function ShoppingPage() {
     setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'pending' } : i))
   }
 
+  async function deleteItem(item: ShoppingItem) {
+    if (!householdId) return
+    setItems(prev => prev.filter(i => i.id !== item.id))
+    const supabase = createClient()
+    await supabase.from('shopping_list').delete().eq('id', item.id)
+
+    toast(`${item.item_name} removed`, {
+      action: {
+        label: 'Undo',
+        onClick: async () => {
+          const { items: _itemFields, ...rest } = item
+          const { error } = await supabase.from('shopping_list').insert({ ...rest, household_id: householdId })
+          if (!error) setItems(prev => [...prev, item])
+        },
+      },
+    })
+  }
+
   function updateQty(item: ShoppingItem, delta: number) {
     const qty = quantities[item.id] ?? 1
     const next = Math.max(1, qty + delta)
@@ -348,6 +369,7 @@ export default function ShoppingPage() {
         )}
       </PageHeader>
 
+      <PullToRefresh onRefresh={async () => { if (householdId) await resyncShoppingList(householdId, createClient()) }}>
       {loading ? (
         <div style={{ padding: '40px 20px', textAlign: 'center' }}>
           <p className="text-sm" style={{ color: 'var(--muted)' }}>Loading…</p>
@@ -362,14 +384,15 @@ export default function ShoppingPage() {
                 <CountBadge count={autoPending.length} />
               </div>
               {autoPending.map(item => (
-                <ItemRow
-                  key={item.id}
-                  item={item}
-                  checked={false}
-                  qty={quantities[item.id] ?? 1}
-                  onUpdateQty={delta => updateQty(item, delta)}
-                  onToggle={() => checkOff(item)}
-                />
+                <SwipeToDeleteRow key={item.id} onDelete={() => deleteItem(item)}>
+                  <ItemRow
+                    item={item}
+                    checked={false}
+                    qty={quantities[item.id] ?? 1}
+                    onUpdateQty={delta => updateQty(item, delta)}
+                    onToggle={() => checkOff(item)}
+                  />
+                </SwipeToDeleteRow>
               ))}
             </div>
           )}
@@ -382,14 +405,15 @@ export default function ShoppingPage() {
                 <CountBadge count={manualPending.length} />
               </div>
               {manualPending.map(item => (
-                <ItemRow
-                  key={item.id}
-                  item={item}
-                  checked={false}
-                  qty={quantities[item.id] ?? 1}
-                  onUpdateQty={delta => updateQty(item, delta)}
-                  onToggle={() => checkOff(item)}
-                />
+                <SwipeToDeleteRow key={item.id} onDelete={() => deleteItem(item)}>
+                  <ItemRow
+                    item={item}
+                    checked={false}
+                    qty={quantities[item.id] ?? 1}
+                    onUpdateQty={delta => updateQty(item, delta)}
+                    onToggle={() => checkOff(item)}
+                  />
+                </SwipeToDeleteRow>
               ))}
             </div>
           )}
@@ -402,14 +426,15 @@ export default function ShoppingPage() {
                 <CountBadge count={recipePending.length} />
               </div>
               {recipePending.map(item => (
-                <ItemRow
-                  key={item.id}
-                  item={item}
-                  checked={false}
-                  qty={quantities[item.id] ?? 1}
-                  onUpdateQty={delta => updateQty(item, delta)}
-                  onToggle={() => checkOff(item)}
-                />
+                <SwipeToDeleteRow key={item.id} onDelete={() => deleteItem(item)}>
+                  <ItemRow
+                    item={item}
+                    checked={false}
+                    qty={quantities[item.id] ?? 1}
+                    onUpdateQty={delta => updateQty(item, delta)}
+                    onToggle={() => checkOff(item)}
+                  />
+                </SwipeToDeleteRow>
               ))}
             </div>
           )}
@@ -445,19 +470,21 @@ export default function ShoppingPage() {
                 </button>
               </div>
               {purchased.map(item => (
-                <ItemRow
-                  key={item.id}
-                  item={item}
-                  checked
-                  qty={quantities[item.id] ?? 1}
-                  onUpdateQty={delta => updateQty(item, delta)}
-                  onToggle={() => uncheck(item)}
-                />
+                <SwipeToDeleteRow key={item.id} onDelete={() => deleteItem(item)}>
+                  <ItemRow
+                    item={item}
+                    checked
+                    qty={quantities[item.id] ?? 1}
+                    onUpdateQty={delta => updateQty(item, delta)}
+                    onToggle={() => uncheck(item)}
+                  />
+                </SwipeToDeleteRow>
               ))}
             </div>
           )}
         </>
       )}
+      </PullToRefresh>
 
       {/* Clears the floating search/add bar below, which sits above the
           bottom nav and would otherwise cover the last list item(s) on a

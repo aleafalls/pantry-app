@@ -4,6 +4,7 @@ import AppBackground from '@/components/layout/AppBackground'
 import PageHeader from '@/components/layout/PageHeader'
 import ChefTabs from '@/components/chef/ChefTabs'
 import ChefAddMenu from '@/components/chef/ChefAddMenu'
+import ChefSwipeableBody from '@/components/chef/ChefSwipeableBody'
 import RecipeIdeasPreview from '@/components/chef/RecipeIdeasPreview'
 import SavedRecipesPreview from '@/components/chef/SavedRecipesPreview'
 import { getChefContext } from '@/lib/chefData'
@@ -60,17 +61,19 @@ export default async function ChefPage() {
       <PageHeader title="Chef" rightAction={<ChefAddMenu />}>
         <ChefTabs />
       </PageHeader>
-      <div className="flex flex-col gap-6" style={{ padding: '20px 20px 0' }}>
-        <ChefSuggestions
-          inventory={context.inventory}
-          priorityItems={context.priorityItems}
-          defaultServings={context.defaultServings}
-          householdId={profile.household_id}
-          userId={user.id}
-        />
-        <RecipeIdeasPreview />
-        <SavedRecipesPreview recipes={savedRecipesPreview} />
-      </div>
+      <ChefSwipeableBody>
+        <div className="flex flex-col gap-6" style={{ padding: '20px 20px 0' }}>
+          <ChefSuggestions
+            inventory={context.inventory}
+            priorityItems={context.priorityItems}
+            defaultServings={context.defaultServings}
+            householdId={profile.household_id}
+            userId={user.id}
+          />
+          <RecipeIdeasPreview />
+          <SavedRecipesPreview recipes={savedRecipesPreview} />
+        </div>
+      </ChefSwipeableBody>
     </AppBackground>
   )
 }

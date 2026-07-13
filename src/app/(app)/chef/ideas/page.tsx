@@ -4,6 +4,7 @@ import AppBackground from '@/components/layout/AppBackground'
 import PageHeader from '@/components/layout/PageHeader'
 import ChefTabs from '@/components/chef/ChefTabs'
 import ChefAddMenu from '@/components/chef/ChefAddMenu'
+import ChefSwipeableBody from '@/components/chef/ChefSwipeableBody'
 import { getChefContext } from '@/lib/chefData'
 import IdeasResults from './IdeasResults'
 
@@ -33,16 +34,18 @@ export default async function ChefIdeasPage({ searchParams }: Props) {
       <PageHeader title="Recipe Ideas" backHref="/chef" rightAction={<ChefAddMenu />}>
         <ChefTabs />
       </PageHeader>
-      <div style={{ padding: '20px 20px 0' }}>
-        <IdeasResults
-          key={q ?? 'none'}
-          inventory={context.inventory}
-          defaultServings={context.defaultServings}
-          query={q}
-          householdId={profile.household_id}
-          userId={user.id}
-        />
-      </div>
+      <ChefSwipeableBody>
+        <div style={{ padding: '20px 20px 0' }}>
+          <IdeasResults
+            key={q ?? 'none'}
+            inventory={context.inventory}
+            defaultServings={context.defaultServings}
+            query={q}
+            householdId={profile.household_id}
+            userId={user.id}
+          />
+        </div>
+      </ChefSwipeableBody>
     </AppBackground>
   )
 }
