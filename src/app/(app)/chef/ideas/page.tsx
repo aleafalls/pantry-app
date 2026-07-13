@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import AppBackground from '@/components/layout/AppBackground'
 import PageHeader from '@/components/layout/PageHeader'
 import ChefTabs from '@/components/chef/ChefTabs'
+import ChefAddMenu from '@/components/chef/ChefAddMenu'
 import { getChefContext } from '@/lib/chefData'
 import IdeasResults from './IdeasResults'
 
@@ -29,7 +30,7 @@ export default async function ChefIdeasPage({ searchParams }: Props) {
 
   return (
     <AppBackground>
-      <PageHeader title="Recipe Ideas" backHref="/chef">
+      <PageHeader title="Recipe Ideas" backHref="/chef" rightAction={<ChefAddMenu />}>
         <ChefTabs />
       </PageHeader>
       <div style={{ padding: '20px 20px 0' }}>

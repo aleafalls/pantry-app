@@ -972,10 +972,9 @@ Already done if Phase 13 is complete. If not, do step 13.1 first — this phase'
 
 ### 14.3 — Manual Recipe Save Flow
 
-1. 🤖 **Claude writes:** `src/app/(app)/chef/new/page.tsx` — form to save a recipe by hand:
-   - Name, servings, ingredients (reusing the `TagInput` pattern for add/remove rows: name + quantity + unit), instructions (multi-line text).
-   - "Save recipe" CTA — writes to `recipes` and `recipe_ingredients`.
-   - No photo field yet — added in Phase 16 once the storage bucket exists.
+✅ **Built:** `src/app/(app)/chef/new/page.tsx` — form to save a recipe by hand: name, course type (`DrawerSelect` + `COURSE_TYPES`), servings (`QuantityStepper`), total time in minutes, tags (`TagInput`, reused directly — same `text[]` shape as `items.tags`), ingredients (new `IngredientRows` component — add/remove rows of `{name, quantity, unit}`, modeled on `TagInput`'s interaction pattern but not a literal reuse since the data shape differs), instructions (new `Textarea` primitive, added via shadcn CLI — first multi-line text field in this codebase). "Save recipe" writes to `recipes` (`source: 'manual'`) and bulk-inserts `recipe_ingredients`, then a `toast.promise` (loading → success with a "View recipe" action) routes to the new recipe's detail page. No photo field yet — added in Phase 16 once the storage bucket exists.
+
+Also built alongside this, since it's the entry point and the landing spot for a save: a shared `ChefAddMenu.tsx` "+" dropdown (shadcn `dropdown-menu`, colors adapted like every other `ui/` primitive) on all four Chef tabs — "Manually Add Recipe" (→ `/chef/new`) plus disabled "Import Recipe from URL" / "Scan a Recipe" placeholders for Phases 15/16 — and a minimal `src/app/(app)/chef/[recipeId]/page.tsx` detail page (name, course/servings/time, ingredients, instructions — no edit/delete/stock/shopping-list actions yet, those are a later phase).
 
 ---
 
@@ -985,8 +984,8 @@ Superseded the original two-tab (Suggestions / My Recipes) plan with a four-tab 
 
 1. ✅ **Built:** `src/components/chef/ChefTabs.tsx` — underlined tab row (active tab bold + yellow underline, matches the provided design rather than the app's existing pill-filter pattern), rendered inside `PageHeader`'s children slot on all four Chef routes (`/chef`, `/chef/tonight`, `/chef/ideas`, `/chef/saved`) so any tab can be reached directly, not just via "All".
 2. ✅ **Built:** `/chef` (All) is the overview — condensed "What to Make Tonight" (2 cards, real data), a "Recipe Ideas" ask-box preview (`RecipeIdeasPreview.tsx`), and a "Saved Recipes" preview (`SavedRecipesPreview.tsx`).
-3. ✅ **Built (structure only):** `/chef/ideas` and `/chef/saved` — dedicated pages exist and are wired into navigation, but show honest empty/coming-soon states rather than fake data, since neither the Recipe Ideas endpoint (14.5b) nor the `recipes` table (14.0) exists yet. The ask box on `/chef` and `/chef/ideas` accepts a query and passes it via `?q=` — not yet wired to an AI call.
-4. **Not yet built:** `src/app/(app)/chef/[recipeId]/page.tsx` recipe detail, and any real "save" functionality — both depend on 14.0/14.3 landing first.
+3. ✅ **Built:** `/chef/saved` now shows real data — cards for each saved recipe (name, course type, time), linking to `/chef/[recipeId]`, falling back to the empty state at zero rows. `/chef/ideas` is still structure-only (honest empty/coming-soon state) since the Recipe Ideas endpoint (14.5b) isn't wired to a save action yet. The ask box on `/chef` and `/chef/ideas` accepts a query and passes it via `?q=` — not yet wired to an AI call.
+4. ✅ **Built (placeholder):** `src/app/(app)/chef/[recipeId]/page.tsx` — plain recipe detail (name, course/servings/time, ingredients, instructions). Real "save" functionality (14.3) is done; a fuller detail view (edit/delete, stock updates, add-to-shopping-list) is still a later phase.
 
 ---
 
