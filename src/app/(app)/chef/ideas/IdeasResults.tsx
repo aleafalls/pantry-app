@@ -7,11 +7,14 @@ import { fetchRecipeIdeas, getCachedRecipeIdeas, matchPercent, setCachedRecipeId
 import { getRandomPrompts } from '@/lib/recipePrompts'
 import AiLoadingCard from '@/components/chef/AiLoadingCard'
 import RecipeIdeaSearchBox from '@/components/chef/RecipeIdeaSearchBox'
+import RecipeIdeaDetailSheet from '@/components/chef/RecipeIdeaDetailSheet'
 
 interface Props {
   inventory: InventoryItem[]
   defaultServings: number
   query?: string
+  householdId: string
+  userId: string
 }
 
 const glassCard: React.CSSProperties = {
@@ -22,7 +25,7 @@ const glassCard: React.CSSProperties = {
   boxShadow: 'oklch(1 0 0 / 0.7) 0px 0px 0px inset, oklch(0.3 0.02 85 / 0.25) 0px 4px 14px -8px',
 }
 
-export default function IdeasResults({ inventory, defaultServings, query }: Props) {
+export default function IdeasResults({ inventory, defaultServings, query, householdId, userId }: Props) {
   const router = useRouter()
   const [inputValue, setInputValue] = useState(query ?? '')
   const [starterPrompts, setStarterPrompts] = useState<string[]>([])
@@ -31,6 +34,7 @@ export default function IdeasResults({ inventory, defaultServings, query }: Prop
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(false)
+  const [selectedIdea, setSelectedIdea] = useState<RecipeIdea | null>(null)
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: randomize client-side only to avoid a server/client hydration mismatch
@@ -157,7 +161,12 @@ export default function IdeasResults({ inventory, defaultServings, query }: Prop
           {suggestions.map((s, i) => {
             const pct = matchPercent(s.ingredients)
             return (
-              <div key={i} className="rounded-14 p-4 flex flex-col gap-2" style={glassCard}>
+              <div
+                key={i}
+                onClick={() => setSelectedIdea(s)}
+                className="rounded-14 p-4 flex flex-col gap-2"
+                style={{ ...glassCard, cursor: 'pointer' }}
+              >
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-base font-bold" style={{ color: 'var(--foreground)' }}>{s.recipe_name}</span>
                   <span
@@ -170,30 +179,23 @@ export default function IdeasResults({ inventory, defaultServings, query }: Prop
                 <span className="text-sm" style={{ color: 'var(--muted)' }}>{s.description}</span>
                 <span className="text-105" style={{ color: 'var(--muted)' }}>Serves {s.servings}</span>
 
-                <div className="flex flex-col gap-1 mt-1">
-                  <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
-                    Ingredients
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {s.ingredients.map(ing => (
-                      <span
-                        key={ing.name}
-                        className="text-105 font-semibold px-1.5 py-0.5 rounded-full"
-                        style={ing.have_on_hand
-                          ? { background: 'color-mix(in srgb, var(--yellow-light) 75%, transparent)', color: 'var(--foreground)' }
-                          : { background: 'var(--surface)', border: '1px solid var(--divider)', color: 'var(--foreground)' }}
-                      >
-                        {ing.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1 mt-1">
-                  <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
-                    Instructions
-                  </span>
-                  <p className="text-105" style={{ color: 'var(--foreground)' }}>{s.instructions}</p>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {s.ingredients.slice(0, 5).map(ing => (
+                    <span
+                      key={ing.name}
+                      className="text-105 font-semibold px-1.5 py-0.5 rounded-full"
+                      style={ing.have_on_hand
+                        ? { background: 'color-mix(in srgb, var(--yellow-light) 75%, transparent)', color: 'var(--foreground)' }
+                        : { background: 'var(--surface)', border: '1px solid var(--divider)', color: 'var(--foreground)' }}
+                    >
+                      {ing.name}
+                    </span>
+                  ))}
+                  {s.ingredients.length > 5 && (
+                    <span className="text-105" style={{ color: 'var(--muted)', alignSelf: 'center' }}>
+                      +{s.ingredients.length - 5} more
+                    </span>
+                  )}
                 </div>
               </div>
             )
@@ -219,6 +221,14 @@ export default function IdeasResults({ inventory, defaultServings, query }: Prop
           </button>
         </div>
       )}
+
+      <RecipeIdeaDetailSheet
+        recipeIdea={selectedIdea}
+        onOpenChange={open => !open && setSelectedIdea(null)}
+        inventory={inventory}
+        householdId={householdId}
+        userId={userId}
+      />
     </div>
   )
 }

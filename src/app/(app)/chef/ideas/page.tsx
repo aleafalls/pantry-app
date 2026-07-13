@@ -39,6 +39,8 @@ export default async function ChefIdeasPage({ searchParams }: Props) {
           inventory={context.inventory}
           defaultServings={context.defaultServings}
           query={q}
+          householdId={profile.household_id}
+          userId={user.id}
         />
       </div>
     </AppBackground>
