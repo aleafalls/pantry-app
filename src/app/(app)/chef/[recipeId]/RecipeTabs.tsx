@@ -18,6 +18,7 @@ export interface RecipeIngredientData {
 export interface RecipeData {
   id: string
   name: string
+  emoji: string | null
   course_type: string | null
   tags: string[] | null
   servings: number | null

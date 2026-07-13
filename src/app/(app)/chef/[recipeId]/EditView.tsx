@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import DrawerSelect from '@/components/ui/DrawerSelect'
+import EmojiPicker from '@/components/ui/EmojiPicker'
 import QuantityStepper from '@/components/add/QuantityStepper'
 import TagInput from '@/components/add/TagInput'
 import IngredientRows, { type RecipeIngredientRow } from '@/components/chef/IngredientRows'
@@ -31,6 +32,7 @@ export default function EditView({ recipe, ingredients: initialIngredients, onSa
   const router = useRouter()
 
   const [name, setName] = useState(recipe.name)
+  const [emoji, setEmoji] = useState(recipe.emoji ?? '🍽️')
   const [courseType, setCourseType] = useState(recipe.course_type ?? '')
   const [tags, setTags] = useState<string[]>(recipe.tags ?? [])
   const [servings, setServings] = useState(recipe.servings ?? 4)
@@ -57,6 +59,7 @@ export default function EditView({ recipe, ingredients: initialIngredients, onSa
     const savePromise = (async () => {
       const { error: recipeError } = await supabase.from('recipes').update({
         name: trimmedName,
+        emoji,
         course_type: courseType || null,
         tags,
         servings,
@@ -126,15 +129,18 @@ export default function EditView({ recipe, ingredients: initialIngredients, onSa
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      <Input
-        type="text"
-        required
-        placeholder="Recipe name"
-        value={name}
-        onChange={e => setName(e.target.value)}
-        className="font-extrabold text-lg"
-        style={{ color: 'var(--foreground)' }}
-      />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <Input
+          type="text"
+          required
+          placeholder="Recipe name"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          className="font-extrabold text-lg"
+          style={{ color: 'var(--foreground)', flex: 1 }}
+        />
+        <EmojiPicker value={emoji} onChange={setEmoji} fallback="🍽️" />
+      </div>
 
       {sectionLabel('Details')}
 

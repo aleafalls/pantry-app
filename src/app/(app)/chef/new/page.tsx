@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import DrawerSelect from '@/components/ui/DrawerSelect'
+import EmojiPicker from '@/components/ui/EmojiPicker'
 import QuantityStepper from '@/components/add/QuantityStepper'
 import TagInput from '@/components/add/TagInput'
 import IngredientRows, { type RecipeIngredientRow } from '@/components/chef/IngredientRows'
@@ -26,6 +27,7 @@ export default function NewRecipePage() {
   const router = useRouter()
 
   const [name, setName] = useState('')
+  const [emoji, setEmoji] = useState('🍽️')
   const [courseType, setCourseType] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [servings, setServings] = useState(4)
@@ -67,6 +69,7 @@ export default function NewRecipePage() {
         id: recipeId,
         household_id: householdId,
         name: trimmedName,
+        emoji,
         course_type: courseType || null,
         tags,
         source: 'manual',
@@ -131,16 +134,19 @@ export default function NewRecipePage() {
 
       <form onSubmit={handleSubmit} style={{ padding: '20px 20px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        <Input
-          type="text"
-          required
-          autoFocus
-          placeholder="Recipe name"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          className="font-extrabold text-lg"
-          style={{ color: 'var(--foreground)' }}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Input
+            type="text"
+            required
+            autoFocus
+            placeholder="Recipe name"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            className="font-extrabold text-lg"
+            style={{ color: 'var(--foreground)', flex: 1 }}
+          />
+          <EmojiPicker value={emoji} onChange={setEmoji} fallback="🍽️" />
+        </div>
 
         {sectionLabel('Details')}
 

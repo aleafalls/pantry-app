@@ -7,6 +7,7 @@ import ChefAddMenu from '@/components/chef/ChefAddMenu'
 import RecipeIdeasPreview from '@/components/chef/RecipeIdeasPreview'
 import SavedRecipesPreview from '@/components/chef/SavedRecipesPreview'
 import { getChefContext } from '@/lib/chefData'
+import { computeMatchPercent } from '@/lib/recipeMatch'
 import ChefSuggestions from './ChefSuggestions'
 
 export default async function ChefPage() {
@@ -23,7 +24,36 @@ export default async function ChefPage() {
 
   if (!profile?.household_id) redirect('/onboarding')
 
-  const context = await getChefContext(supabase, profile.household_id)
+  const [context, { data: recentRecipes }] = await Promise.all([
+    getChefContext(supabase, profile.household_id),
+    supabase
+      .from('recipes')
+      .select('id, name, emoji, image_url, source')
+      .eq('household_id', profile.household_id)
+      .order('created_at', { ascending: false })
+      .limit(2),
+  ])
+
+  const recipeIds = (recentRecipes ?? []).map(r => r.id)
+  const { data: previewIngredients } = recipeIds.length > 0
+    ? await supabase.from('recipe_ingredients').select('recipe_id, name').in('recipe_id', recipeIds)
+    : { data: [] }
+
+  const previewIngredientsByRecipe = new Map<string, string[]>()
+  for (const ing of previewIngredients ?? []) {
+    const list = previewIngredientsByRecipe.get(ing.recipe_id) ?? []
+    list.push(ing.name)
+    previewIngredientsByRecipe.set(ing.recipe_id, list)
+  }
+
+  const savedRecipesPreview = (recentRecipes ?? []).map(recipe => ({
+    id: recipe.id,
+    name: recipe.name,
+    emoji: recipe.emoji,
+    imageUrl: recipe.image_url,
+    source: recipe.source,
+    matchPercent: computeMatchPercent(previewIngredientsByRecipe.get(recipe.id) ?? [], context.inventory),
+  }))
 
   return (
     <AppBackground>
@@ -39,7 +69,7 @@ export default async function ChefPage() {
           userId={user.id}
         />
         <RecipeIdeasPreview />
-        <SavedRecipesPreview />
+        <SavedRecipesPreview recipes={savedRecipesPreview} />
       </div>
     </AppBackground>
   )

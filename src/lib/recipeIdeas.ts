@@ -9,6 +9,7 @@ export interface RecipeIdeaIngredient {
 
 export interface RecipeIdea {
   recipe_name: string
+  emoji: string
   description: string
   servings: number
   instructions: string

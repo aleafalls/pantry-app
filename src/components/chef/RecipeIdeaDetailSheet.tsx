@@ -60,6 +60,7 @@ function RecipeIdeaDetailBody({ recipeIdea, inventory, householdId, userId }: Bo
         id: recipeId,
         household_id: householdId,
         name: recipeIdea.recipe_name,
+        emoji: recipeIdea.emoji,
         source: 'ai',
         servings: recipeIdea.servings,
         instructions: recipeIdea.instructions,

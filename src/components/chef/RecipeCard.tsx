@@ -1,0 +1,92 @@
+import Link from 'next/link'
+
+export interface RecipeCardData {
+  id: string
+  name: string
+  emoji: string | null
+  imageUrl: string | null
+  source: string
+  matchPercent: number
+}
+
+const SOURCE_BADGES: Record<string, { icon: string; label: string; color: string }> = {
+  web: { icon: 'fi-rr-globe', label: 'From the web', color: 'var(--orange)' },
+  social: { icon: 'fi-rr-globe', label: 'From the web', color: 'var(--orange)' },
+  ai: { icon: 'fi-sr-sparkles', label: 'Lemmy Idea', color: 'var(--amber)' },
+  manual: { icon: 'fi-rr-user', label: 'My Recipe', color: 'var(--muted)' },
+  photo: { icon: 'fi-rr-user', label: 'My Recipe', color: 'var(--muted)' },
+}
+
+function badgeStyle(color: string): React.CSSProperties {
+  return {
+    display: 'inline-flex', alignItems: 'center', gap: 4,
+    padding: '4px 8px', borderRadius: 99,
+    background: 'oklch(99% 0.003 85 / 0.85)',
+    backdropFilter: 'blur(4px)',
+    fontSize: 11, fontWeight: 700, color: 'var(--foreground)',
+  }
+}
+
+export default function RecipeCard({ id, name, emoji, imageUrl, source, matchPercent }: RecipeCardData) {
+  const badge = SOURCE_BADGES[source] ?? SOURCE_BADGES.manual
+
+  return (
+    <Link
+      href={`/chef/${id}`}
+      className="flex flex-col gap-2 rounded-14 overflow-hidden"
+      style={{ textDecoration: 'none' }}
+    >
+      <div
+        className="relative flex items-center justify-center"
+        style={{
+          aspectRatio: '1 / 1', borderRadius: 14, overflow: 'hidden',
+          background: imageUrl ? undefined : 'var(--surface)',
+        }}
+      >
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- external/user-supplied recipe photo URLs, not a local/static asset
+          <img src={imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <span style={{ fontSize: 44, lineHeight: 1 }}>{emoji ?? '🍽️'}</span>
+        )}
+
+        <span style={{ position: 'absolute', top: 8, left: 8, ...badgeStyle(badge.color) }}>
+          <i className={badge.icon} style={{ fontSize: 10, display: 'block', lineHeight: 1, color: badge.color }} />
+          {badge.label}
+        </span>
+
+        <span
+          style={{
+            position: 'absolute', top: 8, right: 8,
+            padding: '4px 8px', borderRadius: 99,
+            background: 'color-mix(in srgb, var(--teal) 25%, white)',
+            fontSize: 11, fontWeight: 800, color: 'var(--foreground)',
+          }}
+        >
+          {matchPercent}%
+        </span>
+      </div>
+
+      <span className="text-13 font-bold" style={{ color: 'var(--foreground)', lineHeight: 1.3 }}>
+        {name}
+      </span>
+    </Link>
+  )
+}
+
+export function AddRecipeCard() {
+  return (
+    <Link
+      href="/chef/new"
+      className="flex flex-col items-center justify-center gap-1 rounded-14"
+      style={{
+        aspectRatio: '1 / 1',
+        border: '1.5px dashed var(--divider)',
+        textDecoration: 'none',
+      }}
+    >
+      <i className="fi-rr-plus" style={{ fontSize: 20, color: 'var(--muted)' }} />
+      <span className="text-13 font-bold" style={{ color: 'var(--muted)' }}>Add recipe</span>
+    </Link>
+  )
+}

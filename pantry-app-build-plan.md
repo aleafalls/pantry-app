@@ -926,6 +926,8 @@ create policy "Recipe ingredients writable by household" on public.recipe_ingred
 
 ✅ **Built:** Confirmed live in Supabase — `recipes` and `recipe_ingredients` exist with RLS enabled.
 
+> **Addendum (Saved Recipes grid):** added `emoji text` to `recipes` — a per-recipe emoji for the standardized hero tile shown when there's no `image_url` yet (manual saves get it via the same `EmojiPicker` items use; AI-saved Recipe Ideas get one directly from the model's own response). Run: `alter table public.recipes add column emoji text;`
+
 ✅ **Verify:** Table Editor shows `recipes` and `recipe_ingredients` with RLS enabled.
 
 ---
