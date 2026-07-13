@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { tracksShelfLife, shelfLifeRatio } from './shelfLife'
 
 export interface InventoryItem {
   id: string
@@ -17,10 +18,13 @@ export interface ChefContext {
 }
 
 /**
- * Inventory + "good to use up" items (oldest and highest-quantity, deduped)
- * + household serving size — the shared context both the Chef page's
- * preview grid and the "View More" expanded page need for What to Make
- * Tonight (and, later, Recipe Ideas).
+ * Inventory + "good to use up" items (most shelf-life-urgent and
+ * highest-quantity, deduped) + household serving size — the shared context
+ * both the Chef page's preview grid and the "View More" expanded page need
+ * for What to Make Tonight (and, later, Recipe Ideas). Shelf-life urgency
+ * uses the same category/location-aware ratio as the dashboard's "Use
+ * These Up" (see src/lib/shelfLife.ts) rather than raw purchase-date age,
+ * so a wilting vegetable outranks a can of beans bought the same day.
  */
 export async function getChefContext(supabase: SupabaseClient, householdId: string): Promise<ChefContext> {
   const [{ data: inventoryRows }, { data: household }] = await Promise.all([
@@ -51,9 +55,12 @@ export async function getChefContext(supabase: SupabaseClient, householdId: stri
     location: r.location,
   }))
 
-  const oldest = [...rows]
-    .filter(r => r.purchase_date)
-    .sort((a, b) => new Date(a.purchase_date!).getTime() - new Date(b.purchase_date!).getTime())
+  const mostUrgent = [...rows]
+    .filter((r): r is typeof r & { purchase_date: string } => Boolean(r.purchase_date))
+    .filter(r => tracksShelfLife(r.items.category))
+    .sort((a, b) =>
+      shelfLifeRatio(b.purchase_date, b.items.category, b.location) -
+      shelfLifeRatio(a.purchase_date, a.items.category, a.location))
     .slice(0, 5)
     .map(r => r.items.name)
 
@@ -62,7 +69,7 @@ export async function getChefContext(supabase: SupabaseClient, householdId: stri
     .slice(0, 5)
     .map(r => r.items.name)
 
-  const priorityItems = Array.from(new Set([...oldest, ...highestQuantity]))
+  const priorityItems = Array.from(new Set([...mostUrgent, ...highestQuantity]))
 
   return {
     inventory,
