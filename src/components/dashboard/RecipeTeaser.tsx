@@ -22,11 +22,11 @@ export default function RecipeTeaser() {
       <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
         <div className="shrink-0 flex items-center justify-center"
           style={{ width: 38, height: 38, borderRadius: 11, fontSize: 19, background: 'oklch(99% 0.01 85 / 0.55)', backdropFilter: 'blur(6px)', border: '1px solid oklch(100% 0 0 / 0.6)' }}>
-          🍳
+          🥘
         </div>
 
         <div className="flex flex-col gap-0.5">
-          <span className="text-sm font-bold" style={{ color: '#4A3300' }}>What to Cook Now</span>
+          <span className="text-sm font-bold" style={{ color: '#4A3300' }}>What can I make tonight?</span>
           <span className="text-xs" style={{ color: '#7A5200' }}>See what to make with what you have</span>
         </div>
 

@@ -76,18 +76,19 @@ export default function BottomNav() {
               href={tab.href}
               aria-label={tab.label ?? ''}
               style={{
-                width: 66,
-                flexShrink: 0,
+                flex: 1,
+                minWidth: 0,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 2,
-                padding: '8px 16px',
+                padding: '8px 4px',
                 borderRadius: 28,
                 background: active ? '#EAE6DE' : 'transparent',
                 textDecoration: 'none',
                 transition: 'background 0.15s',
+                overflow: 'hidden',
               }}
             >
               <i
@@ -105,6 +106,9 @@ export default function BottomNav() {
                 color: '#33302B',
                 whiteSpace: 'nowrap',
                 lineHeight: 'normal',
+                maxWidth: '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }}>
                 {tab.label}
               </span>

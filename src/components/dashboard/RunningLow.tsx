@@ -2,14 +2,15 @@ import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { LOCATIONS } from '@/lib/constants'
 
-interface InventoryRow {
-  id: string
-  quantity: number
-  location: string
-  items: { id: string; name: string; emoji: string | null }
+interface LowItemRow {
+  itemId: string
+  name: string
+  emoji: string | null
+  totalQuantity: number
+  primaryLocation: string
 }
 interface Props {
-  items: InventoryRow[]
+  items: LowItemRow[]
   totalLowCount: number
 }
 
@@ -32,6 +33,8 @@ export default function RunningLow({ items, totalLowCount }: Props) {
     )
   }
 
+  const hasMore = totalLowCount > items.length
+
   return (
     <div className="flex flex-col gap-0.5">
 
@@ -50,26 +53,34 @@ export default function RunningLow({ items, totalLowCount }: Props) {
       </div>
 
       {items.map((inv, i) => {
-        const isCritical = inv.quantity === 0
+        const isCritical = inv.totalQuantity === 0
+        const isLastRow = i === items.length - 1
         return (
-          <Link key={inv.id} href={`/inventory/${inv.items.id}`}
+          <Link key={inv.itemId} href={`/inventory/${inv.itemId}`}
             className="flex items-center px-0.5 py-7px gap-9px"
-            style={{ borderBottom: i < items.length - 1 ? '1px solid var(--divider)' : 'none', textDecoration: 'none' }}>
+            style={{ borderBottom: !isLastRow || hasMore ? '1px solid var(--divider)' : 'none', textDecoration: 'none' }}>
             <span className="rounded-full shrink-0"
               style={{ width: 6, height: 6, background: isCritical ? '#EE1B49' : '#FFA070' }} />
-            <span className="text-base leading-none">{inv.items.emoji ?? '📦'}</span>
+            <span className="text-base leading-none">{inv.emoji ?? '📦'}</span>
             <span className="text-13 font-semibold flex-1 truncate"
-              style={{ color: 'var(--foreground)' }}>{inv.items.name}</span>
+              style={{ color: 'var(--foreground)' }}>{inv.name}</span>
             <span className="text-115 shrink-0" style={{ color: 'var(--muted-light)' }}>
-              {LOCATION_LABELS[inv.location] ?? inv.location}
+              {LOCATION_LABELS[inv.primaryLocation] ?? inv.primaryLocation}
             </span>
             <span className="text-xs font-bold shrink-0 text-right w-26px"
               style={{ color: isCritical ? '#C81440' : '#B85A2E' }}>
-              {inv.quantity}
+              {inv.totalQuantity}
             </span>
           </Link>
         )
       })}
+
+      {hasMore && (
+        <Link href="/shopping" className="text-115 font-semibold text-center py-7px"
+          style={{ color: 'var(--muted)', textDecoration: 'none' }}>
+          and {totalLowCount - items.length} more
+        </Link>
+      )}
     </div>
   )
 }

@@ -8,6 +8,8 @@ import RunningLow from '@/components/dashboard/RunningLow'
 import UseTheseUp from '@/components/dashboard/UseTheseUp'
 import ChefPrefetch from '@/components/dashboard/ChefPrefetch'
 import { getChefContext } from '@/lib/chefData'
+import { aggregateInventoryByItem, isRunningLow } from '@/lib/lowStock'
+import { tracksShelfLife, shelfLifeRatio } from '@/lib/shelfLife'
 
 interface DashboardInventoryRow {
   id: string
@@ -23,6 +25,8 @@ interface DashboardInventoryRow {
     low_threshold: number
     active: boolean
     estimated_price: number | null
+    auto_shopping_list: boolean | null
+    category: string
   }
 }
 
@@ -51,7 +55,7 @@ export default async function DashboardPage() {
       .from('inventory')
       .select(`
         id, quantity, unit, location, manual_low_flag, purchase_date,
-        items!inner(id, name, emoji, low_threshold, active, estimated_price)
+        items!inner(id, name, emoji, low_threshold, active, estimated_price, auto_shopping_list, category)
       `)
       .eq('household_id', profile.household_id)
       .eq('items.active', true),
@@ -62,19 +66,22 @@ export default async function DashboardPage() {
   const itemCount = new Set(allInventory.map(i => i.items.id)).size
   const estValue = allInventory.reduce((sum, inv) => sum + inv.quantity * (inv.items.estimated_price ?? 0), 0)
 
-  const lowItems = allInventory
-    .filter(inv => inv.quantity <= inv.items.low_threshold || inv.manual_low_flag)
+  const allLowItems = aggregateInventoryByItem(allInventory)
+    .filter(isRunningLow)
     .sort((a, b) => {
-      if (a.quantity === 0 && b.quantity > 0) return -1
-      if (b.quantity === 0 && a.quantity > 0) return 1
-      return a.items.name.localeCompare(b.items.name)
+      if (a.totalQuantity === 0 && b.totalQuantity > 0) return -1
+      if (b.totalQuantity === 0 && a.totalQuantity > 0) return 1
+      return a.name.localeCompare(b.name)
     })
-    .slice(0, 8)
+  const lowItems = allLowItems.slice(0, 8)
 
   const oldestItems = [...allInventory]
     .filter((inv): inv is DashboardInventoryRow & { purchase_date: string } => Boolean(inv.purchase_date))
-    .sort((a, b) => new Date(a.purchase_date).getTime() - new Date(b.purchase_date).getTime())
-    .slice(0, 5)
+    .filter(inv => tracksShelfLife(inv.items.category))
+    .sort((a, b) =>
+      shelfLifeRatio(b.purchase_date, b.items.category, b.location) -
+      shelfLifeRatio(a.purchase_date, a.items.category, a.location))
+    .slice(0, 8)
 
   const isEmpty = itemCount === 0
 
@@ -114,9 +121,9 @@ export default async function DashboardPage() {
 
         {/* Body — design spec: 14px top, 20px sides, 16px bottom */}
         <div className="flex flex-col gap-4 px-5 pt-14px pb-4">
-          <StatCards itemCount={itemCount} lowCount={lowItems.length} estValue={estValue} />
+          <StatCards itemCount={itemCount} lowCount={allLowItems.length} estValue={estValue} />
           {isEmpty ? <AddFirstItemCard /> : <RecipeTeaser />}
-          <RunningLow items={lowItems} totalLowCount={lowItems.length} />
+          <RunningLow items={lowItems} totalLowCount={allLowItems.length} />
           {oldestItems.length > 0 && <UseTheseUp items={oldestItems} />}
         </div>
       </div>

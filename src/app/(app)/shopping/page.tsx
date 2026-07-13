@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import PageHeader from '@/components/layout/PageHeader'
 import AppBackground from '@/components/layout/AppBackground'
+import { aggregateInventoryByItem, isRunningLow, type LowStockInventoryRow } from '@/lib/lowStock'
 
 interface ShoppingItem {
   id: string
@@ -53,7 +54,7 @@ export default function ShoppingPage() {
       if (!profile?.household_id) return
       setHouseholdId(profile.household_id)
       setDisplayName(profile.display_name ?? '')
-      await loadData(profile.household_id, supabase)
+      await resyncShoppingList(profile.household_id, supabase)
       subscribeRealtime(profile.household_id, supabase)
     })
     // removeChannel fully deregisters from the client — unsubscribe() alone leaves
@@ -111,71 +112,63 @@ export default function ShoppingPage() {
     setLoading(false)
   }
 
-  async function resyncShoppingList() {
-    if (!householdId) return
+  async function resyncShoppingList(hid: string, supabase: ReturnType<typeof createClient>) {
     setResyncing(true)
-    const supabase = createClient()
 
     // Fetch all active inventory with item thresholds
     const { data: inventory } = await supabase
       .from('inventory')
-      .select('item_id, quantity, manual_low_flag, items!inner(id, name, low_threshold, active)')
-      .eq('household_id', householdId)
+      .select('quantity, manual_low_flag, items!inner(id, name, low_threshold, active, auto_shopping_list)')
+      .eq('household_id', hid)
       .eq('items.active', true)
 
     if (inventory) {
-      // Aggregate quantities per item
-      const itemMap = new Map<string, { name: string; total: number; threshold: number; manualLow: boolean }>()
-      const inventoryRows = inventory as unknown as {
-        item_id: string
-        quantity: number
-        manual_low_flag: boolean
-        items: { id: string; name: string; low_threshold: number; active: boolean }
-      }[]
-      for (const row of inventoryRows) {
-        const ex = itemMap.get(row.item_id)
-        if (ex) {
-          ex.total += row.quantity
-          ex.manualLow = ex.manualLow || row.manual_low_flag
-        } else {
-          itemMap.set(row.item_id, {
-            name: row.items.name,
-            total: row.quantity,
-            threshold: row.items.low_threshold,
-            manualLow: row.manual_low_flag,
-          })
-        }
-      }
+      const lowItems = aggregateInventoryByItem(inventory as unknown as LowStockInventoryRow[])
+        .filter(isRunningLow)
+      const lowItemIds = new Set(lowItems.map(item => item.itemId))
 
-      // Get currently pending item_ids so we don't duplicate
       const { data: pending } = await supabase
         .from('shopping_list')
-        .select('item_id')
-        .eq('household_id', householdId)
+        .select('id, item_id, reason')
+        .eq('household_id', hid)
         .eq('status', 'pending')
 
-      const pendingIds = new Set((pending ?? []).map(i => i.item_id).filter(Boolean))
+      const pendingRows = pending ?? []
+      // Only 'auto'/'manual' rows are rendered on this page — a 'recipe' row
+      // for the same item is invisible here and shouldn't block a low item
+      // from getting its own visible "Running Low" entry.
+      const visiblePendingIds = new Set(
+        pendingRows.filter(r => r.reason !== 'recipe').map(i => i.item_id).filter(Boolean)
+      )
 
-      // Insert entries for items that are low but not on the list
-      const toAdd = []
-      for (const [itemId, data] of itemMap) {
-        if ((data.total <= data.threshold || data.manualLow) && !pendingIds.has(itemId)) {
-          toAdd.push({
-            household_id: householdId,
-            item_id: itemId,
-            item_name: data.name,
-            reason: 'auto',
-            status: 'pending',
-          })
-        }
-      }
+      // Insert entries for items that are low but not already visible on the list
+      const toAdd = lowItems
+        .filter(item => !visiblePendingIds.has(item.itemId))
+        .map(item => ({
+          household_id: hid,
+          item_id: item.itemId,
+          item_name: item.name,
+          reason: 'auto' as const,
+          status: 'pending' as const,
+        }))
 
       if (toAdd.length > 0) {
         await supabase.from('shopping_list').insert(toAdd)
       }
+
+      // Clear auto entries for items that are no longer low (restocked
+      // elsewhere, threshold raised, or alerting turned off) — keeps this
+      // list from drifting out of sync with the live "Running Low" state.
+      const staleIds = pendingRows
+        .filter(row => row.reason === 'auto' && row.item_id && !lowItemIds.has(row.item_id))
+        .map(row => row.id)
+
+      if (staleIds.length > 0) {
+        await supabase.from('shopping_list').update({ status: 'cleared' }).in('id', staleIds)
+      }
     }
 
-    await loadData(householdId, supabase)
+    await loadData(hid, supabase)
     setResyncing(false)
   }
 
@@ -313,7 +306,7 @@ export default function ShoppingPage() {
         title="Shopping List"
         rightAction={
           <button
-            onClick={resyncShoppingList}
+            onClick={() => householdId && resyncShoppingList(householdId, createClient())}
             disabled={resyncing}
             aria-label="Refresh shopping list"
             style={{
