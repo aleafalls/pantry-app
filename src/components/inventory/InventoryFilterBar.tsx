@@ -30,7 +30,7 @@ export function FilterChip({ label, count, onClick }: { label: string; count: nu
         fontWeight: active ? 700 : 500,
         cursor: 'pointer',
         border: active ? '2px solid var(--yellow)' : '1px solid var(--divider)',
-        background: active ? 'var(--yellow-light)' : 'var(--surface)',
+        background: active ? 'var(--yellow-light)' : 'rgb(234, 230, 222)',
         color: active ? '#4A3300' : 'var(--foreground)',
         fontFamily: 'inherit',
       }}
