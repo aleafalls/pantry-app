@@ -459,6 +459,12 @@ export default function ShoppingPage() {
         </>
       )}
 
+      {/* Clears the floating search/add bar below, which sits above the
+          bottom nav and would otherwise cover the last list item(s) on a
+          long list — AppBackground's own paddingBottom only accounts for
+          the nav itself, not this page's extra floating bar. */}
+      <div style={{ height: 60 }} />
+
       {/* Search / add bar — pinned above bottom nav */}
       <div style={{
         position: 'fixed',
