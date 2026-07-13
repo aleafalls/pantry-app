@@ -17,6 +17,7 @@ interface ShoppingItem {
   added_by: string | null
   store: string | null
   quantity: number | null
+  unit: string | null
   items?: {
     emoji: string | null
     preferred_stores: string[]
@@ -90,7 +91,7 @@ export default function ShoppingPage() {
   async function loadData(hid: string, supabase: ReturnType<typeof createClient>) {
     const [{ data: listItems }, { data: storeRows }] = await Promise.all([
       supabase.from('shopping_list')
-        .select('id, item_id, item_name, reason, status, added_by, store, quantity, items(emoji, preferred_stores, default_restock_qty, default_unit)')
+        .select('id, item_id, item_name, reason, status, added_by, store, quantity, unit, items(emoji, preferred_stores, default_restock_qty, default_unit)')
         .eq('household_id', hid)
         .neq('status', 'cleared')
         .order('added_at', { ascending: true }),
@@ -197,6 +198,7 @@ export default function ShoppingPage() {
   const purchased = visibleItems.filter(i => i.status === 'purchased')
   const autoPending = pending.filter(i => i.reason === 'auto')
   const manualPending = pending.filter(i => i.reason === 'manual')
+  const recipePending = pending.filter(i => i.reason === 'recipe')
 
   async function checkOff(item: ShoppingItem) {
     // Only mark purchased and save the quantity chosen — inventory isn't
@@ -380,6 +382,26 @@ export default function ShoppingPage() {
                 <CountBadge count={manualPending.length} />
               </div>
               {manualPending.map(item => (
+                <ItemRow
+                  key={item.id}
+                  item={item}
+                  checked={false}
+                  qty={quantities[item.id] ?? 1}
+                  onUpdateQty={delta => updateQty(item, delta)}
+                  onToggle={() => checkOff(item)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* From Recipes section */}
+          {recipePending.length > 0 && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '12px 20px 4px' }}>
+                <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>From recipes</span>
+                <CountBadge count={recipePending.length} />
+              </div>
+              {recipePending.map(item => (
                 <ItemRow
                   key={item.id}
                   item={item}
@@ -577,7 +599,7 @@ function ItemRow({ item, checked, qty, onUpdateQty, onToggle }: {
   onUpdateQty: (delta: number) => void
   onToggle: () => void
 }) {
-  const unit = item.items?.default_unit ?? ''
+  const unit = item.unit ?? item.items?.default_unit ?? ''
 
   return (
     <div style={{

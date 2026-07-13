@@ -14,6 +14,17 @@ export const CATEGORIES = [
   'Household & Other',
 ]
 
+export const COURSE_TYPES = [
+  'Breakfast',
+  'Lunch',
+  'Dinner',
+  'Appetizer',
+  'Side',
+  'Dessert',
+  'Snack',
+  'Drink',
+]
+
 export const UNITS_GROUPED: Record<string, string[]> = {
   'Count':           ['each', 'pair', 'pack', 'box', 'bag', 'bunch', 'loaf', 'roll'],
   'Volume':          ['fl oz', 'cup', 'pint', 'quart', 'gallon', 'ml', 'L'],

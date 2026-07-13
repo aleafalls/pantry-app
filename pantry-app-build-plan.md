@@ -879,6 +879,8 @@ For items added before AI enrichment existed.
 
 ### 14.0 — Recipes Data Model (Supabase)
 
+> Expanded past the original minimal spec per direct request: added `course_type`, `tags`, `total_time_minutes` on `recipes`, and widened the `source` comment to include `social` (recipes are shared household-wide already, for free, via the same `household_id` + RLS pattern every table uses — no schema change needed for that). Web/social-media *import* itself is still out of scope here — that's Phases 15–16 — this just avoids a future column migration when that lands. `course_type` is a fixed list (`COURSE_TYPES` in `src/lib/constants.ts`), matching how `CATEGORIES` works; no `CHECK` constraint, validated app-side like every other "enum-ish" column in this project.
+
 **New database objects (user runs in Supabase SQL Editor), household-scoped with RLS like `stores` in 9.0:**
 
 ```sql
@@ -886,10 +888,13 @@ create table public.recipes (
   id uuid primary key default uuid_generate_v4(),
   household_id uuid not null references public.households(id),
   name text not null,
-  source text not null default 'manual', -- 'manual' | 'web' | 'photo' | 'ai'
+  course_type text,
+  tags text[] default '{}',
+  source text not null default 'manual', -- 'manual' | 'web' | 'social' | 'photo' | 'ai'
   source_url text,
   image_url text,
   servings int,
+  total_time_minutes int,
   instructions text,
   created_by uuid references public.profiles(id),
   created_at timestamptz default now()
@@ -917,7 +922,9 @@ create policy "Recipe ingredients writable by household" on public.recipe_ingred
 );
 ```
 
-`matched_item_id` is nullable and populated later (14.5) to score a recipe against current inventory.
+`matched_item_id` is nullable and populated later (14.5) to score a recipe against current inventory, and is also what a future recipe-detail view uses to update stock and add missing ingredients to the shopping list (`shopping_list.reason = 'recipe'` already exists in the data model) — that UI is a later sub-phase, not built here.
+
+✅ **Built:** Confirmed live in Supabase — `recipes` and `recipe_ingredients` exist with RLS enabled.
 
 ✅ **Verify:** Table Editor shows `recipes` and `recipe_ingredients` with RLS enabled.
 
@@ -965,10 +972,9 @@ Already done if Phase 13 is complete. If not, do step 13.1 first — this phase'
 
 ### 14.3 — Manual Recipe Save Flow
 
-1. 🤖 **Claude writes:** `src/app/(app)/chef/new/page.tsx` — form to save a recipe by hand:
-   - Name, servings, ingredients (reusing the `TagInput` pattern for add/remove rows: name + quantity + unit), instructions (multi-line text).
-   - "Save recipe" CTA — writes to `recipes` and `recipe_ingredients`.
-   - No photo field yet — added in Phase 16 once the storage bucket exists.
+✅ **Built:** `src/app/(app)/chef/new/page.tsx` — form to save a recipe by hand: name, course type (`DrawerSelect` + `COURSE_TYPES`), servings (`QuantityStepper`), total time in minutes, tags (`TagInput`, reused directly — same `text[]` shape as `items.tags`), ingredients (new `IngredientRows` component — add/remove rows of `{name, quantity, unit}`, modeled on `TagInput`'s interaction pattern but not a literal reuse since the data shape differs), instructions (new `Textarea` primitive, added via shadcn CLI — first multi-line text field in this codebase). "Save recipe" writes to `recipes` (`source: 'manual'`) and bulk-inserts `recipe_ingredients`, then a `toast.promise` (loading → success with a "View recipe" action) routes to the new recipe's detail page. No photo field yet — added in Phase 16 once the storage bucket exists.
+
+Also built alongside this, since it's the entry point and the landing spot for a save: a shared `ChefAddMenu.tsx` "+" dropdown (shadcn `dropdown-menu`, colors adapted like every other `ui/` primitive) on all four Chef tabs — "Manually Add Recipe" (→ `/chef/new`) plus disabled "Import Recipe from URL" / "Scan a Recipe" placeholders for Phases 15/16 — and a minimal `src/app/(app)/chef/[recipeId]/page.tsx` detail page (name, course/servings/time, ingredients, instructions — no edit/delete/stock/shopping-list actions yet, those are a later phase).
 
 ---
 
@@ -978,8 +984,9 @@ Superseded the original two-tab (Suggestions / My Recipes) plan with a four-tab 
 
 1. ✅ **Built:** `src/components/chef/ChefTabs.tsx` — underlined tab row (active tab bold + yellow underline, matches the provided design rather than the app's existing pill-filter pattern), rendered inside `PageHeader`'s children slot on all four Chef routes (`/chef`, `/chef/tonight`, `/chef/ideas`, `/chef/saved`) so any tab can be reached directly, not just via "All".
 2. ✅ **Built:** `/chef` (All) is the overview — condensed "What to Make Tonight" (2 cards, real data), a "Recipe Ideas" ask-box preview (`RecipeIdeasPreview.tsx`), and a "Saved Recipes" preview (`SavedRecipesPreview.tsx`).
-3. ✅ **Built (structure only):** `/chef/ideas` and `/chef/saved` — dedicated pages exist and are wired into navigation, but show honest empty/coming-soon states rather than fake data, since neither the Recipe Ideas endpoint (14.5b) nor the `recipes` table (14.0) exists yet. The ask box on `/chef` and `/chef/ideas` accepts a query and passes it via `?q=` — not yet wired to an AI call.
-4. **Not yet built:** `src/app/(app)/chef/[recipeId]/page.tsx` recipe detail, and any real "save" functionality — both depend on 14.0/14.3 landing first.
+3. ✅ **Built:** `/chef/saved` now shows real data — cards for each saved recipe (name, course type, time), linking to `/chef/[recipeId]`, falling back to the empty state at zero rows. `/chef/ideas` is still structure-only (honest empty/coming-soon state) since the Recipe Ideas endpoint (14.5b) isn't wired to a save action yet. The ask box on `/chef` and `/chef/ideas` accepts a query and passes it via `?q=` — not yet wired to an AI call.
+4. ✅ **Built:** `src/app/(app)/chef/[recipeId]/page.tsx` — full recipe detail view, three local tabs (`RecipeTabs.tsx`, client-side state, no routing): **Cook** (`CookView.tsx` — large readable type, numbered instructions, meant to be read while actively cooking), **Plan** (`PlanView.tsx` — matches ingredients against real inventory using the same exact-match logic as `SuggestionDetailSheet.tsx`, lets you adjust on-hand quantity down after cooking via "Update stock," or add missing ingredients straight to the shopping list with `reason: 'recipe'`), **Edit** (`EditView.tsx` — same field set as the manual save form, prefilled, plus a delete-recipe action using the same inline confirm pattern as `ItemDetail.tsx`'s "Remove item").
+   - Along the way, fixed a latent bug in `src/app/(app)/shopping/page.tsx`: it only ever rendered `reason: 'auto'`/`'manual'` shopping-list rows — `reason: 'recipe'` rows (already inserted elsewhere by `SuggestionDetailSheet.tsx`, now also by `PlanView.tsx`) were saved but never displayed. Added a "From Recipes" section alongside the existing "Running low"/"Added" ones.
 
 ---
 

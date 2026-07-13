@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import PageHeader from '@/components/layout/PageHeader'
 import ChefTabs from '@/components/chef/ChefTabs'
+import ChefAddMenu from '@/components/chef/ChefAddMenu'
 import OnHandToggle from '@/components/chef/OnHandToggle'
 import type { InventoryItem } from '@/lib/chefData'
 import TonightResults from './TonightResults'
@@ -20,7 +21,7 @@ export default function TonightPageContent({ inventory, priorityItems, defaultSe
 
   return (
     <>
-      <PageHeader title="What to Make Tonight" backHref="/chef">
+      <PageHeader title="What to Make Tonight" backHref="/chef" rightAction={<ChefAddMenu />}>
         <ChefTabs />
         <OnHandToggle strictOnly={strictOnly} onToggle={() => setStrictOnly(v => !v)} />
       </PageHeader>
