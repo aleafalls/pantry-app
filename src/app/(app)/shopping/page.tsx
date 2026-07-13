@@ -204,6 +204,7 @@ export default function ShoppingPage() {
   const purchased = visibleItems.filter(i => i.status === 'purchased')
   const autoPending = pending.filter(i => i.reason === 'auto')
   const manualPending = pending.filter(i => i.reason === 'manual')
+  const recipePending = pending.filter(i => i.reason === 'recipe')
 
   async function checkOff(item: ShoppingItem) {
     // Only mark purchased and save the quantity chosen — inventory isn't
@@ -387,6 +388,26 @@ export default function ShoppingPage() {
                 <CountBadge count={manualPending.length} />
               </div>
               {manualPending.map(item => (
+                <ItemRow
+                  key={item.id}
+                  item={item}
+                  checked={false}
+                  qty={quantities[item.id] ?? 1}
+                  onUpdateQty={delta => updateQty(item, delta)}
+                  onToggle={() => checkOff(item)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* From Recipes section */}
+          {recipePending.length > 0 && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '12px 20px 4px' }}>
+                <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>From recipes</span>
+                <CountBadge count={recipePending.length} />
+              </div>
+              {recipePending.map(item => (
                 <ItemRow
                   key={item.id}
                   item={item}

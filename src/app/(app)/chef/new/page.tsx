@@ -51,7 +51,7 @@ export default function NewRecipePage() {
     })
   }, [])
 
-  const isValid = name.trim() && instructions.trim() && ingredients.length > 0
+  const isValid = name.trim() && ingredients.length > 0
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -72,7 +72,7 @@ export default function NewRecipePage() {
         source: 'manual',
         servings,
         total_time_minutes: totalTimeMinutes || null,
-        instructions: instructions.trim(),
+        instructions: instructions.trim() || null,
         created_by: userId,
       })
       if (recipeError) throw new Error(recipeError.message)
@@ -186,9 +186,13 @@ export default function NewRecipePage() {
         {sectionLabel('Ingredients')}
         <IngredientRows ingredients={ingredients} onChange={setIngredients} />
 
-        {sectionLabel('Instructions')}
+        <div style={{ padding: '8px 0 4px' }}>
+          <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
+            Instructions
+          </span>
+          <span className="text-11 font-medium" style={{ color: 'var(--muted)' }}> (optional)</span>
+        </div>
         <Textarea
-          required
           placeholder="Step-by-step directions…"
           value={instructions}
           onChange={e => setInstructions(e.target.value)}
