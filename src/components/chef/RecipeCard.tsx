@@ -1,5 +1,13 @@
 import Link from 'next/link'
 
+const glassCard: React.CSSProperties = {
+  backdropFilter: 'blur(14px) saturate(180%)',
+  WebkitBackdropFilter: 'blur(14px) saturate(180%)',
+  border: '1px solid oklch(100% 0 0 / 0.6)',
+  background: 'var(--glass-card)',
+  boxShadow: 'oklch(1 0 0 / 0.7) 0px 0px 0px inset, oklch(0.3 0.02 85 / 0.25) 0px 4px 14px -8px',
+}
+
 export interface RecipeCardData {
   id: string
   name: string
@@ -36,8 +44,8 @@ export default function RecipeCard({ id, name, emoji, imageUrl, source, matchPer
       className="flex flex-col rounded-14 overflow-hidden"
       style={{
         aspectRatio: '1 / 1',
-        background: 'var(--surface)',
         textDecoration: 'none',
+        ...glassCard,
       }}
     >
       <div
@@ -91,9 +99,9 @@ export function AddRecipeCard() {
       className="flex flex-col items-center justify-center gap-1 rounded-14"
       style={{
         aspectRatio: '1 / 1',
-        background: 'var(--surface)',
-        border: '1.5px dashed var(--divider)',
         textDecoration: 'none',
+        ...glassCard,
+        border: '1.5px dashed var(--divider)',
       }}
     >
       <i className="fi-rr-plus" style={{ fontSize: 20, color: 'var(--muted)' }} />
