@@ -16,7 +16,7 @@ interface Props {
 const locationOptions: SelectOption[] = LOCATIONS.map(l => ({ value: l.value, label: `${l.emoji} ${l.label}` }))
 const categoryOptions: SelectOption[] = CATEGORIES.map(c => ({ value: c, label: c }))
 
-function FilterChip({ label, count, onClick }: { label: string; count: number; onClick: () => void }) {
+export function FilterChip({ label, count, onClick }: { label: string; count: number; onClick: () => void }) {
   const active = count > 0
   return (
     <button
