@@ -205,7 +205,14 @@ function NewItemForm() {
 
     try {
       await savePromise
-      router.push('/add')
+      // Return to wherever this form was opened from (Add search, Shopping
+      // list, Inventory) rather than always landing on /add — same
+      // history-with-fallback pattern PageHeader's back button uses.
+      if (window.history.length <= 1) {
+        router.push(shoppingListId ? '/shopping' : '/add')
+      } else {
+        router.back()
+      }
     } catch {
       // already surfaced via toast.promise's error handler
     } finally {
