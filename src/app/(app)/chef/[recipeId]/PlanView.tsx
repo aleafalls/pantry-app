@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { InventoryItem } from '@/lib/chefData'
 import { parseLeadingQuantity } from '@/lib/quantity'
+import CompactStepper from '@/components/chef/CompactStepper'
 import type { RecipeIngredientData } from './RecipeTabs'
 
 interface Props {
@@ -216,8 +217,8 @@ export default function PlanView({ ingredients, inventory, householdId, userId }
 
                   <CompactStepper
                     value={pendingQty[ing.name]}
+                    baseline={baselineQty[ing.name]}
                     unit={match.unit}
-                    changed={pendingQty[ing.name] !== baselineQty[ing.name]}
                     onChange={v => setPendingQty(prev => ({ ...prev, [ing.name]: v }))}
                   />
                 </div>
@@ -288,48 +289,6 @@ export default function PlanView({ ingredients, inventory, householdId, userId }
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-function CompactStepper({ value, unit, changed, onChange }: { value: number; unit: string; changed: boolean; onChange: (value: number) => void }) {
-  const fill = changed ? 'color-mix(in srgb, var(--yellow-light) 55%, lab(99 0.1 1.08))' : 'lab(99 0.1 1.08)'
-  const border = changed ? '1px solid var(--yellow)' : '1px solid oklch(100% 0 0 / 0.5)'
-
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0, width: 104 }}>
-      <button
-        type="button"
-        onClick={() => onChange(Math.max(0, value - 1))}
-        style={{
-          width: 26, height: 26, borderRadius: '8px 0 0 8px',
-          border, borderRight: 'none',
-          background: fill, color: 'var(--foreground)',
-          fontSize: 15, fontWeight: 600, cursor: value <= 0 ? 'not-allowed' : 'pointer',
-          opacity: value <= 0 ? 0.3 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}
-      >−</button>
-      <div style={{
-        flex: 1, height: 26, padding: '0 4px', overflow: 'hidden',
-        borderTop: border, borderBottom: border,
-        background: fill, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 12, fontWeight: 700, color: 'var(--foreground)', whiteSpace: 'nowrap',
-      }}>
-        {value}{unit ? ` ${unit}` : ''}
-      </div>
-      <button
-        type="button"
-        onClick={() => onChange(value + 1)}
-        style={{
-          width: 26, height: 26, borderRadius: '0 8px 8px 0',
-          border, borderLeft: 'none',
-          background: fill, color: 'var(--foreground)',
-          fontSize: 15, fontWeight: 600, cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}
-      >
-        <i className="fi-rr-plus" style={{ fontSize: 11, display: 'block', lineHeight: 1 }} />
-      </button>
     </div>
   )
 }
