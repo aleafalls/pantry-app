@@ -4,7 +4,7 @@ import AppBackground from '@/components/layout/AppBackground'
 import PageHeader from '@/components/layout/PageHeader'
 import ChefTabs from '@/components/chef/ChefTabs'
 import ChefAddMenu from '@/components/chef/ChefAddMenu'
-import RecipeCard, { AddRecipeCard } from '@/components/chef/RecipeCard'
+import RecipeCard from '@/components/chef/RecipeCard'
 import { getChefContext } from '@/lib/chefData'
 import { computeMatchPercent } from '@/lib/recipeMatch'
 
@@ -50,7 +50,6 @@ export default async function ChefSavedPage() {
       </PageHeader>
       <div style={{ padding: '20px 20px 0' }}>
         <div className="grid grid-cols-2 gap-3">
-          <AddRecipeCard />
           {(recipes ?? []).map(recipe => (
             <RecipeCard
               key={recipe.id}

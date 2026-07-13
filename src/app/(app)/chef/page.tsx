@@ -31,7 +31,7 @@ export default async function ChefPage() {
       .select('id, name, emoji, image_url, source')
       .eq('household_id', profile.household_id)
       .order('created_at', { ascending: false })
-      .limit(2),
+      .limit(6),
   ])
 
   const recipeIds = (recentRecipes ?? []).map(r => r.id)
