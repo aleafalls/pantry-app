@@ -17,7 +17,7 @@ const SOURCE_BADGES: Record<string, { icon: string; label: string; color: string
   photo: { icon: 'fi-rr-user', label: 'My Recipe', color: 'var(--muted)' },
 }
 
-function badgeStyle(color: string): React.CSSProperties {
+function badgeStyle(): React.CSSProperties {
   return {
     display: 'inline-flex', alignItems: 'center', gap: 4,
     padding: '4px 8px', borderRadius: 99,
@@ -33,24 +33,25 @@ export default function RecipeCard({ id, name, emoji, imageUrl, source, matchPer
   return (
     <Link
       href={`/chef/${id}`}
-      className="flex flex-col gap-2 rounded-14 overflow-hidden"
-      style={{ textDecoration: 'none' }}
+      className="flex flex-col rounded-14 overflow-hidden"
+      style={{
+        aspectRatio: '1 / 1',
+        background: 'var(--surface)',
+        textDecoration: 'none',
+      }}
     >
       <div
         className="relative flex items-center justify-center"
-        style={{
-          aspectRatio: '1 / 1', borderRadius: 14, overflow: 'hidden',
-          background: imageUrl ? undefined : 'var(--surface)',
-        }}
+        style={{ flex: 1, minHeight: 0 }}
       >
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- external/user-supplied recipe photo URLs, not a local/static asset
           <img src={imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <span style={{ fontSize: 44, lineHeight: 1 }}>{emoji ?? '🍽️'}</span>
+          <span style={{ fontSize: 40, lineHeight: 1 }}>{emoji ?? '🍽️'}</span>
         )}
 
-        <span style={{ position: 'absolute', top: 8, left: 8, ...badgeStyle(badge.color) }}>
+        <span style={{ position: 'absolute', top: 8, left: 8, ...badgeStyle() }}>
           <i className={badge.icon} style={{ fontSize: 10, display: 'block', lineHeight: 1, color: badge.color }} />
           {badge.label}
         </span>
@@ -67,9 +68,18 @@ export default function RecipeCard({ id, name, emoji, imageUrl, source, matchPer
         </span>
       </div>
 
-      <span className="text-13 font-bold" style={{ color: 'var(--foreground)', lineHeight: 1.3 }}>
-        {name}
-      </span>
+      <div style={{ padding: '8px 10px' }}>
+        <span
+          className="text-13 font-bold"
+          style={{
+            color: 'var(--foreground)', lineHeight: 1.3,
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {name}
+        </span>
+      </div>
     </Link>
   )
 }
@@ -81,6 +91,7 @@ export function AddRecipeCard() {
       className="flex flex-col items-center justify-center gap-1 rounded-14"
       style={{
         aspectRatio: '1 / 1',
+        background: 'var(--surface)',
         border: '1.5px dashed var(--divider)',
         textDecoration: 'none',
       }}
