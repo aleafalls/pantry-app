@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { InventoryItem } from '@/lib/chefData'
 import type { RecipeIngredientData } from './RecipeTabs'
@@ -45,12 +45,50 @@ export default function PlanView({ ingredients, inventory, householdId, userId }
   })
   const [pendingQty, setPendingQty] = useState<Record<string, number>>(() => ({ ...baselineQty }))
   const [addedToList, setAddedToList] = useState<Set<string>>(new Set())
+  const [addingAll, setAddingAll] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [justUpdated, setJustUpdated] = useState(false)
 
   const dirty = Object.keys(baselineQty).some(name => pendingQty[name] !== baselineQty[name])
 
+  const onHandIngredients = ingredients.filter(ing => {
+    const match = matches.get(ing.name)
+    return !!match && match.total > 0
+  })
+  const neededIngredients = ingredients.filter(ing => {
+    const match = matches.get(ing.name)
+    return !match || match.total <= 0
+  })
+
+  // Reflect anything already on the shopping list (from a previous visit,
+  // or added via another flow) so the cart icon starts checked, not just
+  // right after clicking it in this session.
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from('shopping_list')
+      .select('item_id, item_name')
+      .eq('household_id', householdId)
+      .eq('status', 'pending')
+      .then(({ data }) => {
+        if (!data) return
+        const pendingItemIds = new Set(data.map(r => r.item_id).filter(Boolean))
+        const pendingNames = new Set(data.map(r => r.item_name.trim().toLowerCase()))
+        setAddedToList(prev => {
+          const next = new Set(prev)
+          for (const ing of ingredients) {
+            const match = matches.get(ing.name)
+            const alreadyPending = (match?.itemId && pendingItemIds.has(match.itemId))
+              || pendingNames.has(ing.name.trim().toLowerCase())
+            if (alreadyPending) next.add(ing.name)
+          }
+          return next
+        })
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+  }, [])
+
   async function handleAddToList(name: string, itemId: string | null) {
+    if (addedToList.has(name)) return
     const supabase = createClient()
     if (itemId) {
       const { count } = await supabase.from('shopping_list')
@@ -77,13 +115,16 @@ export default function PlanView({ ingredients, inventory, householdId, userId }
       })
     }
     setAddedToList(prev => new Set(prev).add(name))
-    setTimeout(() => {
-      setAddedToList(prev => {
-        const next = new Set(prev)
-        next.delete(name)
-        return next
-      })
-    }, 2000)
+  }
+
+  async function handleAddAllToList() {
+    setAddingAll(true)
+    await Promise.all(
+      neededIngredients
+        .filter(ing => !addedToList.has(ing.name))
+        .map(ing => handleAddToList(ing.name, matches.get(ing.name)?.itemId ?? null))
+    )
+    setAddingAll(false)
   }
 
   async function handleUpdateStock() {
@@ -121,74 +162,124 @@ export default function PlanView({ ingredients, inventory, householdId, userId }
     setTimeout(() => setJustUpdated(false), 2000)
   }
 
+  const allNeededAdded = neededIngredients.length > 0 && neededIngredients.every(ing => addedToList.has(ing.name))
+
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
-          Stock
-        </span>
-        {dirty && (
-          <button
-            type="button"
-            onClick={handleUpdateStock}
-            disabled={updating}
-            style={{
-              flexShrink: 0, padding: '6px 12px', borderRadius: 99, border: 'none',
-              background: justUpdated ? 'var(--surface)' : 'linear-gradient(150deg, var(--yellow-light), var(--yellow))',
-              color: justUpdated ? 'var(--foreground)' : '#4A3300',
-              fontSize: 12, fontWeight: 700, cursor: updating ? 'default' : 'pointer',
-            }}
-          >
-            {updating ? 'Saving…' : justUpdated ? 'Updated!' : 'Update stock'}
-          </button>
-        )}
-      </div>
+    <div className="flex flex-col gap-6">
+      {onHandIngredients.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
+              In Stock
+            </span>
+            {dirty && (
+              <button
+                type="button"
+                onClick={handleUpdateStock}
+                disabled={updating}
+                style={{
+                  flexShrink: 0, padding: '6px 12px', borderRadius: 99, border: 'none',
+                  background: justUpdated ? 'var(--surface)' : 'linear-gradient(150deg, var(--yellow-light), var(--yellow))',
+                  color: justUpdated ? 'var(--foreground)' : '#4A3300',
+                  fontSize: 12, fontWeight: 700, cursor: updating ? 'default' : 'pointer',
+                }}
+              >
+                {updating ? 'Saving…' : justUpdated ? 'Updated!' : 'Update stock'}
+              </button>
+            )}
+          </div>
 
-      <div className="flex flex-col gap-2">
-        {ingredients.map(ing => {
-          const match = matches.get(ing.name)
-          const onHand = !!match && match.total > 0
-          return (
-            <div key={ing.id} className="flex items-center justify-between gap-3">
-              <div style={{ minWidth: 0 }}>
-                <span className="text-sm font-semibold truncate" style={{ color: 'var(--foreground)', display: 'block' }}>
-                  {ing.name}
-                </span>
-                {(ing.quantity || ing.unit) && (
-                  <span className="text-105" style={{ color: 'var(--muted)' }}>
-                    Recipe calls for {[ing.quantity, ing.unit].filter(Boolean).join(' ')}
-                  </span>
-                )}
-              </div>
+          <div className="flex flex-col gap-2">
+            {onHandIngredients.map(ing => {
+              const match = matches.get(ing.name)!
+              return (
+                <div key={ing.id} className="flex items-center justify-between gap-3">
+                  <div style={{ minWidth: 0 }}>
+                    <span className="text-sm font-semibold truncate" style={{ color: 'var(--foreground)', display: 'block' }}>
+                      {ing.name}
+                    </span>
+                    {(ing.quantity || ing.unit) && (
+                      <span className="text-105" style={{ color: 'var(--muted)' }}>
+                        Recipe calls for {[ing.quantity, ing.unit].filter(Boolean).join(' ')}
+                      </span>
+                    )}
+                  </div>
 
-              {onHand ? (
-                <CompactStepper
-                  value={pendingQty[ing.name]}
-                  unit={match!.unit}
-                  changed={pendingQty[ing.name] !== baselineQty[ing.name]}
-                  onChange={v => setPendingQty(prev => ({ ...prev, [ing.name]: v }))}
-                />
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => handleAddToList(ing.name, match?.itemId ?? null)}
-                  style={{
-                    width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                    border: '1px solid var(--divider)', background: 'var(--surface)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                    color: addedToList.has(ing.name) ? 'var(--teal)' : 'var(--foreground)',
-                  }}
-                >
-                  <i
-                    className={addedToList.has(ing.name) ? 'fi-sr-check' : 'fi-rr-shopping-cart'}
-                    style={{ fontSize: 14, display: 'block', lineHeight: 1 }}
+                  <CompactStepper
+                    value={pendingQty[ing.name]}
+                    unit={match.unit}
+                    changed={pendingQty[ing.name] !== baselineQty[ing.name]}
+                    onChange={v => setPendingQty(prev => ({ ...prev, [ing.name]: v }))}
                   />
-                </button>
-              )}
-            </div>
-          )
-        })}
-      </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {neededIngredients.length > 0 && (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
+              Needed
+            </span>
+            {!allNeededAdded && (
+              <button
+                type="button"
+                onClick={handleAddAllToList}
+                disabled={addingAll}
+                style={{
+                  flexShrink: 0, padding: '6px 12px', borderRadius: 99, border: 'none',
+                  background: 'linear-gradient(150deg, var(--yellow-light), var(--yellow))',
+                  color: '#4A3300',
+                  fontSize: 12, fontWeight: 700, cursor: addingAll ? 'default' : 'pointer',
+                }}
+              >
+                {addingAll ? 'Adding…' : 'Add all to list'}
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {neededIngredients.map(ing => {
+              const match = matches.get(ing.name)
+              const added = addedToList.has(ing.name)
+              return (
+                <div key={ing.id} className="flex items-center justify-between gap-3">
+                  <div style={{ minWidth: 0 }}>
+                    <span className="text-sm font-semibold truncate" style={{ color: 'var(--foreground)', display: 'block' }}>
+                      {ing.name}
+                    </span>
+                    {(ing.quantity || ing.unit) && (
+                      <span className="text-105" style={{ color: 'var(--muted)' }}>
+                        Recipe calls for {[ing.quantity, ing.unit].filter(Boolean).join(' ')}
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleAddToList(ing.name, match?.itemId ?? null)}
+                    style={{
+                      width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                      border: '1px solid var(--divider)', background: 'var(--surface)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: added ? 'default' : 'pointer',
+                      color: added ? 'var(--teal)' : 'var(--foreground)',
+                    }}
+                  >
+                    <i
+                      className={added ? 'fi-sr-check' : 'fi-rr-shopping-cart'}
+                      style={{ fontSize: 14, display: 'block', lineHeight: 1 }}
+                    />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
