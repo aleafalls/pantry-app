@@ -879,6 +879,8 @@ For items added before AI enrichment existed.
 
 ### 14.0 — Recipes Data Model (Supabase)
 
+> Expanded past the original minimal spec per direct request: added `course_type`, `tags`, `total_time_minutes` on `recipes`, and widened the `source` comment to include `social` (recipes are shared household-wide already, for free, via the same `household_id` + RLS pattern every table uses — no schema change needed for that). Web/social-media *import* itself is still out of scope here — that's Phases 15–16 — this just avoids a future column migration when that lands. `course_type` is a fixed list (`COURSE_TYPES` in `src/lib/constants.ts`), matching how `CATEGORIES` works; no `CHECK` constraint, validated app-side like every other "enum-ish" column in this project.
+
 **New database objects (user runs in Supabase SQL Editor), household-scoped with RLS like `stores` in 9.0:**
 
 ```sql
@@ -886,10 +888,13 @@ create table public.recipes (
   id uuid primary key default uuid_generate_v4(),
   household_id uuid not null references public.households(id),
   name text not null,
-  source text not null default 'manual', -- 'manual' | 'web' | 'photo' | 'ai'
+  course_type text,
+  tags text[] default '{}',
+  source text not null default 'manual', -- 'manual' | 'web' | 'social' | 'photo' | 'ai'
   source_url text,
   image_url text,
   servings int,
+  total_time_minutes int,
   instructions text,
   created_by uuid references public.profiles(id),
   created_at timestamptz default now()
@@ -917,7 +922,9 @@ create policy "Recipe ingredients writable by household" on public.recipe_ingred
 );
 ```
 
-`matched_item_id` is nullable and populated later (14.5) to score a recipe against current inventory.
+`matched_item_id` is nullable and populated later (14.5) to score a recipe against current inventory, and is also what a future recipe-detail view uses to update stock and add missing ingredients to the shopping list (`shopping_list.reason = 'recipe'` already exists in the data model) — that UI is a later sub-phase, not built here.
+
+✅ **Built:** Confirmed live in Supabase — `recipes` and `recipe_ingredients` exist with RLS enabled.
 
 ✅ **Verify:** Table Editor shows `recipes` and `recipe_ingredients` with RLS enabled.
 
