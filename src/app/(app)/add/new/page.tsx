@@ -33,7 +33,11 @@ function NewItemForm() {
   const [emoji, setEmoji] = useState(searchParams.get('emoji') ?? '📦')
 
   // ── Stock ─────────────────────────────────────────────────
-  const [quantity, setQuantity] = useState(1)
+  // Arriving from a shopping-list entry means this is being catalogued,
+  // not confirmed as purchased yet — default to 0 on hand rather than
+  // silently claiming you already have one. Checking it off on the
+  // shopping list later is what actually adds real stock.
+  const [quantity, setQuantity] = useState(shoppingListId ? 0 : 1)
   const [unit, setUnit] = useState(searchParams.get('unit') ?? 'each')
   const [location, setLocation] = useState(searchParams.get('location') ?? 'pantry')
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0])
@@ -139,7 +143,7 @@ function NewItemForm() {
     setPreferredStores(prev => [...prev, storeName])
   }
 
-  const isValid = name.trim() && category && location && unit && quantity > 0
+  const isValid = name.trim() && category && location && unit && (shoppingListId ? quantity >= 0 : quantity > 0)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -277,7 +281,7 @@ function NewItemForm() {
         {detailRow(
           'quantity',
           <Label>Quantity</Label>,
-          <QuantityStepper value={quantity} onChange={setQuantity} min={1} />
+          <QuantityStepper value={quantity} onChange={setQuantity} min={shoppingListId ? 0 : 1} />
         )}
 
         {detailRow(
