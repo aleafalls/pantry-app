@@ -8,6 +8,11 @@ const glassCard: React.CSSProperties = {
   boxShadow: 'oklch(1 0 0 / 0.7) 0px 0px 0px inset, oklch(0.3 0.02 85 / 0.25) 0px 4px 14px -8px',
 }
 
+// Same yellow/teal pairing as AppBackground's decorative page blobs, at
+// similarly light opacity, blended into the page background color — gives
+// the fallback hero tile a soft sense of depth instead of a flat fill.
+const heroGradient = 'linear-gradient(135deg, color-mix(in srgb, #FFDD55 16%, var(--background)), color-mix(in srgb, #23967F 12%, var(--background)))'
+
 export interface RecipeCardData {
   id: string
   name: string
@@ -50,7 +55,7 @@ export default function RecipeCard({ id, name, emoji, imageUrl, source, matchPer
     >
       <div
         className="relative flex items-center justify-center"
-        style={{ flex: 1, minHeight: 0 }}
+        style={{ flex: 1, minHeight: 0, background: imageUrl ? undefined : heroGradient }}
       >
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- external/user-supplied recipe photo URLs, not a local/static asset
