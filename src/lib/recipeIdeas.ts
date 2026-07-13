@@ -53,15 +53,29 @@ interface CachedRecipeIdeas {
   suggestions: RecipeIdea[]
 }
 
-// Module-level so it survives Next.js client-side navigation — remembers
-// only the most recent Ideas search, so leaving the tab and coming back
-// restores what was already generated instead of starting over.
-let lastIdeas: CachedRecipeIdeas | null = null
+const STORAGE_KEY = 'chef-recipe-ideas-cache'
 
+// Backed by sessionStorage (not just a module variable) so the most recent
+// Ideas search survives a real page reload — not just in-app navigation.
+// This matters on mobile/PWA, where a backgrounded tab often gets its JS
+// context killed and reloaded fresh on return. sessionStorage clears when
+// the browser tab actually closes, so this never outlives the session.
 export function getCachedRecipeIdeas(): CachedRecipeIdeas | null {
-  return lastIdeas
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.sessionStorage.getItem(STORAGE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
 }
 
 export function setCachedRecipeIdeas(query: string, suggestions: RecipeIdea[]) {
-  lastIdeas = { query, suggestions }
+  if (typeof window === 'undefined') return
+  try {
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ query, suggestions }))
+  } catch {
+    // Storage full or unavailable (e.g. private browsing) — fail silently,
+    // this is a convenience cache, not critical state.
+  }
 }
