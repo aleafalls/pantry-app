@@ -16,6 +16,7 @@ interface ShoppingItem {
   added_by: string | null
   store: string | null
   quantity: number | null
+  unit: string | null
   items?: {
     emoji: string | null
     preferred_stores: string[]
@@ -89,7 +90,7 @@ export default function ShoppingPage() {
   async function loadData(hid: string, supabase: ReturnType<typeof createClient>) {
     const [{ data: listItems }, { data: storeRows }] = await Promise.all([
       supabase.from('shopping_list')
-        .select('id, item_id, item_name, reason, status, added_by, store, quantity, items(emoji, preferred_stores, default_restock_qty, default_unit)')
+        .select('id, item_id, item_name, reason, status, added_by, store, quantity, unit, items(emoji, preferred_stores, default_restock_qty, default_unit)')
         .eq('household_id', hid)
         .neq('status', 'cleared')
         .order('added_at', { ascending: true }),
@@ -605,7 +606,7 @@ function ItemRow({ item, checked, qty, onUpdateQty, onToggle }: {
   onUpdateQty: (delta: number) => void
   onToggle: () => void
 }) {
-  const unit = item.items?.default_unit ?? ''
+  const unit = item.unit ?? item.items?.default_unit ?? ''
 
   return (
     <div style={{

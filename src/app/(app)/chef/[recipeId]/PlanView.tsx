@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { InventoryItem } from '@/lib/chefData'
+import { parseLeadingQuantity } from '@/lib/quantity'
 import type { RecipeIngredientData } from './RecipeTabs'
 
 interface Props {
@@ -87,9 +88,13 @@ export default function PlanView({ ingredients, inventory, householdId, userId }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
   }, [])
 
-  async function handleAddToList(name: string, itemId: string | null) {
-    if (addedToList.has(name)) return
+  async function handleAddToList(ing: RecipeIngredientData) {
+    if (addedToList.has(ing.name)) return
+    const itemId = matches.get(ing.name)?.itemId ?? null
+    const quantity = parseLeadingQuantity(ing.quantity) ?? undefined
+    const unit = ing.unit ?? undefined
     const supabase = createClient()
+
     if (itemId) {
       const { count } = await supabase.from('shopping_list')
         .select('id', { count: 'exact', head: true })
@@ -98,23 +103,27 @@ export default function PlanView({ ingredients, inventory, householdId, userId }
         await supabase.from('shopping_list').insert({
           household_id: householdId,
           item_id: itemId,
-          item_name: name,
+          item_name: ing.name,
           reason: 'recipe',
           status: 'pending',
           added_by: userId,
+          quantity,
+          unit,
         })
       }
     } else {
       await supabase.from('shopping_list').insert({
         household_id: householdId,
         item_id: null,
-        item_name: name,
+        item_name: ing.name,
         reason: 'recipe',
         status: 'pending',
         added_by: userId,
+        quantity,
+        unit,
       })
     }
-    setAddedToList(prev => new Set(prev).add(name))
+    setAddedToList(prev => new Set(prev).add(ing.name))
   }
 
   async function handleAddAllToList() {
@@ -122,7 +131,7 @@ export default function PlanView({ ingredients, inventory, householdId, userId }
     await Promise.all(
       neededIngredients
         .filter(ing => !addedToList.has(ing.name))
-        .map(ing => handleAddToList(ing.name, matches.get(ing.name)?.itemId ?? null))
+        .map(ing => handleAddToList(ing))
     )
     setAddingAll(false)
   }
@@ -243,7 +252,6 @@ export default function PlanView({ ingredients, inventory, householdId, userId }
 
           <div className="flex flex-col gap-2">
             {neededIngredients.map(ing => {
-              const match = matches.get(ing.name)
               const added = addedToList.has(ing.name)
               return (
                 <div key={ing.id} className="flex items-center justify-between gap-3">
@@ -260,7 +268,7 @@ export default function PlanView({ ingredients, inventory, householdId, userId }
 
                   <button
                     type="button"
-                    onClick={() => handleAddToList(ing.name, match?.itemId ?? null)}
+                    onClick={() => handleAddToList(ing)}
                     style={{
                       width: 36, height: 36, borderRadius: 10, flexShrink: 0,
                       border: '1px solid var(--divider)', background: 'var(--surface)',
