@@ -4,14 +4,17 @@ import { useState } from 'react'
 import { useDrag } from '@use-gesture/react'
 
 const REVEAL_WIDTH = 80
-const DELETE_THRESHOLD = 160
+const COMMIT_THRESHOLD = 160
 
 interface Props {
   children: React.ReactNode
-  onDelete: () => void
+  onAction: () => void
+  actionLabel: string
+  actionIcon: string
+  actionColor: string
 }
 
-export default function SwipeToDeleteRow({ children, onDelete }: Props) {
+export default function SwipeActionRow({ children, onAction, actionLabel, actionIcon, actionColor }: Props) {
   const [x, setX] = useState(0)
   const [dragging, setDragging] = useState(false)
 
@@ -24,9 +27,9 @@ export default function SwipeToDeleteRow({ children, onDelete }: Props) {
     }
     setDragging(false)
     const fastSwipeLeft = vx > 0.5 && dx < 0
-    if (clamped < -DELETE_THRESHOLD || fastSwipeLeft) {
+    if (clamped < -COMMIT_THRESHOLD || fastSwipeLeft) {
       setX(-500)
-      setTimeout(onDelete, 180)
+      setTimeout(onAction, 180)
     } else if (clamped < -24) {
       setX(-REVEAL_WIDTH)
     } else {
@@ -41,24 +44,24 @@ export default function SwipeToDeleteRow({ children, onDelete }: Props) {
 
   return (
     <div style={{ position: 'relative', overflow: 'hidden' }}>
-      {/* Delete button, revealed behind the row content */}
+      {/* Action button, revealed behind the row content */}
       <div style={{ position: 'absolute', inset: 0, display: 'flex', justifyContent: 'flex-end' }}>
         <button
           type="button"
-          onClick={() => { setX(0); onDelete() }}
-          aria-label="Delete"
+          onClick={() => { setX(0); onAction() }}
+          aria-label={actionLabel}
           style={{
-            width: REVEAL_WIDTH, border: 'none', background: 'var(--red)', color: '#fff',
+            width: REVEAL_WIDTH, border: 'none', background: actionColor, color: '#fff',
             fontSize: 12, fontWeight: 700, cursor: 'pointer',
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3,
           }}
         >
-          <i className="fi-rr-trash" style={{ fontSize: 15, display: 'block', lineHeight: 1 }} />
-          Delete
+          <i className={actionIcon} style={{ fontSize: 15, display: 'block', lineHeight: 1 }} />
+          {actionLabel}
         </button>
       </div>
 
-      {/* Row content — dragging left reveals the delete button; tapping
+      {/* Row content — dragging left reveals the action button; tapping
           while revealed dismisses instead of firing the tap underneath. */}
       <div
         {...bind()}

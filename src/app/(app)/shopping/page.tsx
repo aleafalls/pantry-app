@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import PageHeader from '@/components/layout/PageHeader'
 import AppBackground from '@/components/layout/AppBackground'
-import SwipeToDeleteRow from '@/components/ui/SwipeToDeleteRow'
+import SwipeActionRow from '@/components/ui/SwipeActionRow'
 import PullToRefresh from '@/components/ui/PullToRefresh'
 import { aggregateInventoryByItem, isRunningLow, type LowStockInventoryRow } from '@/lib/lowStock'
 
@@ -16,7 +16,7 @@ interface ShoppingItem {
   item_id: string | null
   item_name: string
   reason: 'auto' | 'manual' | 'recipe'
-  status: 'pending' | 'purchased' | 'cleared'
+  status: 'pending' | 'purchased' | 'cleared' | 'saved_for_later'
   added_by: string | null
   store: string | null
   quantity: number | null
@@ -44,6 +44,7 @@ export default function ShoppingPage() {
   const [quantities, setQuantities] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [resyncing, setResyncing] = useState(false)
+  const [savedExpanded, setSavedExpanded] = useState(false)
   const realtimeRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
 
@@ -135,12 +136,14 @@ export default function ShoppingPage() {
         .from('shopping_list')
         .select('id, item_id, reason')
         .eq('household_id', hid)
-        .eq('status', 'pending')
+        .in('status', ['pending', 'saved_for_later'])
 
       const pendingRows = pending ?? []
-      // Only 'auto'/'manual' rows are rendered on this page — a 'recipe' row
-      // for the same item is invisible here and shouldn't block a low item
-      // from getting its own visible "Running Low" entry.
+      // Saved-for-later counts as "already handled" too, so a dismissed
+      // auto item doesn't get silently recreated on the next resync — see
+      // saveForLater(). Only 'auto'/'manual' rows are rendered on this page
+      // — a 'recipe' row for the same item is invisible here and shouldn't
+      // block a low item from getting its own visible "Running Low" entry.
       const visiblePendingIds = new Set(
         pendingRows.filter(r => r.reason !== 'recipe').map(i => i.item_id).filter(Boolean)
       )
@@ -199,6 +202,7 @@ export default function ShoppingPage() {
 
   const pending = visibleItems.filter(i => i.status === 'pending')
   const purchased = visibleItems.filter(i => i.status === 'purchased')
+  const savedForLater = visibleItems.filter(i => i.status === 'saved_for_later')
   const autoPending = pending.filter(i => i.reason === 'auto')
   const manualPending = pending.filter(i => i.reason === 'manual')
   const recipePending = pending.filter(i => i.reason === 'recipe')
@@ -217,6 +221,22 @@ export default function ShoppingPage() {
   }
 
   async function uncheck(item: ShoppingItem) {
+    const supabase = createClient()
+    await supabase.from('shopping_list').update({ status: 'pending' }).eq('id', item.id)
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'pending' } : i))
+  }
+
+  async function saveForLater(item: ShoppingItem) {
+    const supabase = createClient()
+    await supabase.from('shopping_list').update({ status: 'saved_for_later' }).eq('id', item.id)
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'saved_for_later' } : i))
+
+    toast(`${item.item_name} saved for later`, {
+      action: { label: 'Undo', onClick: () => restoreItem(item) },
+    })
+  }
+
+  async function restoreItem(item: ShoppingItem) {
     const supabase = createClient()
     await supabase.from('shopping_list').update({ status: 'pending' }).eq('id', item.id)
     setItems(prev => prev.map(i => i.id === item.id ? { ...i, status: 'pending' } : i))
@@ -384,7 +404,13 @@ export default function ShoppingPage() {
                 <CountBadge count={autoPending.length} />
               </div>
               {autoPending.map(item => (
-                <SwipeToDeleteRow key={item.id} onDelete={() => deleteItem(item)}>
+                <SwipeActionRow
+                  key={item.id}
+                  actionLabel="Save"
+                  actionIcon="fi-rr-bookmark"
+                  actionColor="var(--amber)"
+                  onAction={() => saveForLater(item)}
+                >
                   <ItemRow
                     item={item}
                     checked={false}
@@ -392,7 +418,7 @@ export default function ShoppingPage() {
                     onUpdateQty={delta => updateQty(item, delta)}
                     onToggle={() => checkOff(item)}
                   />
-                </SwipeToDeleteRow>
+                </SwipeActionRow>
               ))}
             </div>
           )}
@@ -405,7 +431,13 @@ export default function ShoppingPage() {
                 <CountBadge count={manualPending.length} />
               </div>
               {manualPending.map(item => (
-                <SwipeToDeleteRow key={item.id} onDelete={() => deleteItem(item)}>
+                <SwipeActionRow
+                  key={item.id}
+                  actionLabel="Save"
+                  actionIcon="fi-rr-bookmark"
+                  actionColor="var(--amber)"
+                  onAction={() => saveForLater(item)}
+                >
                   <ItemRow
                     item={item}
                     checked={false}
@@ -413,7 +445,7 @@ export default function ShoppingPage() {
                     onUpdateQty={delta => updateQty(item, delta)}
                     onToggle={() => checkOff(item)}
                   />
-                </SwipeToDeleteRow>
+                </SwipeActionRow>
               ))}
             </div>
           )}
@@ -426,7 +458,13 @@ export default function ShoppingPage() {
                 <CountBadge count={recipePending.length} />
               </div>
               {recipePending.map(item => (
-                <SwipeToDeleteRow key={item.id} onDelete={() => deleteItem(item)}>
+                <SwipeActionRow
+                  key={item.id}
+                  actionLabel="Save"
+                  actionIcon="fi-rr-bookmark"
+                  actionColor="var(--amber)"
+                  onAction={() => saveForLater(item)}
+                >
                   <ItemRow
                     item={item}
                     checked={false}
@@ -434,7 +472,7 @@ export default function ShoppingPage() {
                     onUpdateQty={delta => updateQty(item, delta)}
                     onToggle={() => checkOff(item)}
                   />
-                </SwipeToDeleteRow>
+                </SwipeActionRow>
               ))}
             </div>
           )}
@@ -470,7 +508,13 @@ export default function ShoppingPage() {
                 </button>
               </div>
               {purchased.map(item => (
-                <SwipeToDeleteRow key={item.id} onDelete={() => deleteItem(item)}>
+                <SwipeActionRow
+                  key={item.id}
+                  actionLabel="Delete"
+                  actionIcon="fi-rr-trash"
+                  actionColor="var(--red)"
+                  onAction={() => deleteItem(item)}
+                >
                   <ItemRow
                     item={item}
                     checked
@@ -478,7 +522,53 @@ export default function ShoppingPage() {
                     onUpdateQty={delta => updateQty(item, delta)}
                     onToggle={() => uncheck(item)}
                   />
-                </SwipeToDeleteRow>
+                </SwipeActionRow>
+              ))}
+            </div>
+          )}
+
+          {/* Saved for Later — collapsed by default so items you've set
+              aside don't clutter the active list, but stay visible/
+              recoverable rather than disappearing entirely. */}
+          {savedForLater.length > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <button
+                type="button"
+                onClick={() => setSavedExpanded(v => !v)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6, width: '100%',
+                  padding: '12px 20px 4px', background: 'none', border: 'none',
+                  cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                }}
+              >
+                <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>Saved for later</span>
+                <CountBadge count={savedForLater.length} />
+                <i
+                  className="fi-rr-angle-down"
+                  style={{
+                    fontSize: 12, display: 'block', lineHeight: 1, color: 'var(--muted)',
+                    marginLeft: 'auto', transition: 'transform 0.2s ease',
+                    transform: savedExpanded ? 'rotate(180deg)' : 'none',
+                  }}
+                />
+              </button>
+              {savedExpanded && savedForLater.map(item => (
+                <SwipeActionRow
+                  key={item.id}
+                  actionLabel="Delete"
+                  actionIcon="fi-rr-trash"
+                  actionColor="var(--red)"
+                  onAction={() => deleteItem(item)}
+                >
+                  <ItemRow
+                    item={item}
+                    checked={false}
+                    qty={quantities[item.id] ?? 1}
+                    onUpdateQty={delta => updateQty(item, delta)}
+                    onToggle={() => restoreItem(item)}
+                    restoreMode
+                  />
+                </SwipeActionRow>
               ))}
             </div>
           )}
@@ -625,12 +715,13 @@ function CountBadge({ count }: { count: number }) {
   )
 }
 
-function ItemRow({ item, checked, qty, onUpdateQty, onToggle }: {
+function ItemRow({ item, checked, qty, onUpdateQty, onToggle, restoreMode }: {
   item: ShoppingItem
   checked: boolean
   qty: number
   onUpdateQty: (delta: number) => void
   onToggle: () => void
+  restoreMode?: boolean
 }) {
   const unit = item.unit ?? item.items?.default_unit ?? ''
 
@@ -641,19 +732,23 @@ function ItemRow({ item, checked, qty, onUpdateQty, onToggle }: {
       borderBottom: '1px solid var(--divider)',
       opacity: checked ? 0.45 : 1,
     }}>
-      {/* Checkbox */}
+      {/* Checkbox — in restoreMode this instead moves the item back to the
+          active list, so it's styled as a distinct "restore" affordance
+          rather than the purchase-checkmark. */}
       <button
         type="button"
         onClick={onToggle}
+        aria-label={restoreMode ? 'Move back to list' : undefined}
         style={{
           width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-          border: checked ? 'none' : '1.5px solid var(--divider)',
+          border: checked ? 'none' : restoreMode ? '1.5px solid var(--amber)' : '1.5px solid var(--divider)',
           background: checked ? 'var(--yellow)' : 'transparent',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer',
         }}
       >
         {checked && <i className="fi-rr-check" style={{ fontSize: 11, display: 'block', lineHeight: 1, color: '#4A3300' }} />}
+        {!checked && restoreMode && <i className="fi-rr-undo" style={{ fontSize: 11, display: 'block', lineHeight: 1, color: 'var(--amber)' }} />}
       </button>
 
       {/* Emoji */}
