@@ -42,6 +42,8 @@ This document is the step-by-step guide for building the pantry app from zero to
 15. [Phase 14 — Chef: Recipes & AI Suggestions *(Phase 3)*](#phase-14--chef-recipes--ai-suggestions-phase-3)
 16. [Phase 15 — Chef: Web Recipe Import *(Phase 3)*](#phase-15--chef-web-recipe-import-phase-3)
 17. [Phase 16 — Chef: Photo Recipe Import *(Phase 3)*](#phase-16--chef-photo-recipe-import-phase-3)
+18. [Phase 17 — Receipt Scanning *(Future)*](#phase-17--receipt-scanning-future)
+19. [Phase 18 — Batch Inventory from a Cabinet Photo *(Future)*](#phase-18--batch-inventory-from-a-cabinet-photo-future)
 
 ---
 
@@ -1099,6 +1101,28 @@ The Suggestions tab splits into two sections rather than a single suggestion lis
 1. 🤖 **Claude writes:** Reuses the confirm/edit screen from 15.4 — same review-before-save principle applies, especially for handwriting, which is the least reliable input for this flow.
 
 ✅ **Verify:** Take a photo of a printed recipe — fields pre-fill reasonably. Take a photo of a handwritten recipe card — check quality; if handwriting recognition is unreliable, that's worth flagging as a known limitation rather than something to keep tuning.
+
+---
+
+## Phase 17 — Receipt Scanning *(Future)*
+
+**Goal:** Photograph a grocery receipt to restock items in bulk instead of one at a time. Same shape as Phase 16 (photo in → Claude vision extraction → confirm screen), different domain: line items with quantity/price rather than recipe ingredients/instructions.
+
+> Not yet scoped in detail. Notes from the Phase 16 discussion:
+> - Separate `receipt-photos` storage bucket, not shared with `recipe-photos` — different retention needs (a receipt likely shouldn't be kept indefinitely; a recipe photo probably should).
+> - Extraction is closer to OCR/line-item parsing than Phase 16's free-text recipe extraction — likely higher accuracy out of the gate than the cabinet-photo case below, since receipts are printed and structured.
+> - Needs matching logic against existing `items`/`catalog` (by name) before writing to `inventory`, plus a review-before-save step — same principle as every other AI extraction path in this app, more important here since it writes real stock changes.
+
+---
+
+## Phase 18 — Batch Inventory from a Cabinet Photo *(Future)*
+
+**Goal:** Photograph a shelf or spice cabinet and add multiple items to inventory in one pass, instead of adding them one at a time through the normal Add flow.
+
+> Not yet scoped in detail. Notes from the Phase 16 discussion:
+> - Harder than Phases 16–17: this is object recognition across a cluttered image (identifying several distinct physical items), not text extraction from one document. Accuracy — especially on small spice-jar labels — needs real testing before trusting it to bulk-write inventory.
+> - Separate storage bucket from recipe/receipt photos, same reasoning as Phase 17.
+> - Confirm screen is even more load-bearing here — likely needs per-item accept/reject/edit, not just one bulk "looks right" confirmation, since misreads are more likely than in the receipt case.
 
 ---
 
