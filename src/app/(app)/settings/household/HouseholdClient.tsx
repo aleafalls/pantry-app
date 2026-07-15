@@ -60,6 +60,7 @@ export default function HouseholdClient({ userId, household, members }: Props) {
   const [copiedCode, setCopiedCode] = useState(false)
   const [removeTarget, setRemoveTarget] = useState<Member | null>(null)
   const [removing, setRemoving] = useState(false)
+  const [removeError, setRemoveError] = useState('')
   const [enrichingAll, setEnrichingAll] = useState(false)
   const [enrichProgress, setEnrichProgress] = useState<{ done: number; total: number } | null>(null)
 
@@ -113,9 +114,11 @@ export default function HouseholdClient({ userId, household, members }: Props) {
   async function removeMember() {
     if (!removeTarget) return
     setRemoving(true)
+    setRemoveError('')
     const supabase = createClient()
-    await supabase.from('profiles').update({ household_id: null }).eq('id', removeTarget.id)
+    const { error } = await supabase.rpc('remove_household_member', { p_member_id: removeTarget.id })
     setRemoving(false)
+    if (error) { setRemoveError('Something went wrong. Please try again.'); return }
     setRemoveTarget(null)
     router.refresh()
   }
@@ -312,7 +315,7 @@ export default function HouseholdClient({ userId, household, members }: Props) {
                 {isOwner && member.id !== userId && (
                   <button
                     type="button"
-                    onClick={() => setRemoveTarget(member)}
+                    onClick={() => { setRemoveError(''); setRemoveTarget(member) }}
                     style={{
                       background: 'none', border: 'none', cursor: 'pointer',
                       color: 'var(--red)', fontSize: 13, fontWeight: 700,
@@ -378,6 +381,7 @@ export default function HouseholdClient({ userId, household, members }: Props) {
           <p className="text-sm text-center mb-6" style={{ color: 'var(--muted)' }}>
             They&apos;ll lose access to {household.name} and its inventory, shopping list, and recipes. They can rejoin later with the invite code.
           </p>
+          {removeError && <p className="text-sm text-center mb-4" style={{ color: 'var(--red)' }}>{removeError}</p>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <button
               onClick={removeMember}
