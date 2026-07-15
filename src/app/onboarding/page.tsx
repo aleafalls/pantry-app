@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import OnboardingTour from '@/components/onboarding/OnboardingTour'
 
 // Different emoji set from auth page to avoid repetition
 const FLOATING_CARDS: {
@@ -47,7 +48,7 @@ function generateInviteCode() {
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const [step, setStep] = useState<'name' | 'household'>('name')
+  const [step, setStep] = useState<'tour' | 'name' | 'household'>('tour')
   const [displayName, setDisplayName] = useState('')
   const [householdName, setHouseholdName] = useState('')
   const [loading, setLoading] = useState(false)
@@ -175,28 +176,49 @@ export default function OnboardingPage() {
         border: '1px solid oklch(100% 0 0 / 0.6)',
         boxShadow: 'oklch(1 0 0 / 0.7) 0px 0px 0px inset, oklch(0.3 0.02 85 / 0.25) 0px 8px 32px -8px',
       }}>
-        {/* Title + description */}
+        {/* Title + description, or Skip for the tour */}
         <div style={{ marginBottom: 20 }}>
-          <h1 style={{
-            fontSize: 22, fontWeight: 800, margin: '0 0 6px',
-            color: 'var(--foreground)', letterSpacing: '-0.01em',
-          }}>
-            {step === 'name' ? "What's your name?" : 'Name your household'}
-          </h1>
-          <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
-            {step === 'name'
-              ? "This is how you'll appear to your household members."
-              : 'Pick something that feels like home.'}
-          </p>
+          {step === 'tour' ? (
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setStep('name')}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600, color: 'var(--muted)',
+                  fontFamily: 'inherit', padding: 0,
+                }}
+              >
+                Skip
+              </button>
+            </div>
+          ) : (
+            <>
+              <h1 style={{
+                fontSize: 22, fontWeight: 800, margin: '0 0 6px',
+                color: 'var(--foreground)', letterSpacing: '-0.01em',
+              }}>
+                {step === 'name' ? "What's your name?" : 'Name your household'}
+              </h1>
+              <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
+                {step === 'name'
+                  ? "This is how you'll appear to your household members."
+                  : 'Pick something that feels like home.'}
+              </p>
+            </>
+          )}
         </div>
 
         {/* Step indicator */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
           <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'var(--yellow)' }} />
+          <div style={{ flex: 1, height: 4, borderRadius: 2, background: step !== 'tour' ? 'var(--yellow)' : 'var(--divider)' }} />
           <div style={{ flex: 1, height: 4, borderRadius: 2, background: step === 'household' ? 'var(--yellow)' : 'var(--divider)' }} />
         </div>
 
-        {step === 'name' ? (
+        {step === 'tour' ? (
+          <OnboardingTour onDone={() => setStep('name')} />
+        ) : step === 'name' ? (
           <form onSubmit={handleNameSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Label htmlFor="name" style={{ color: 'var(--foreground)' }}>Your name</Label>
             <Input
