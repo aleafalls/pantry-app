@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import PageHeader from '@/components/layout/PageHeader'
 import AppBackground from '@/components/layout/AppBackground'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import EmojiPicker, { AVATAR_EMOJI_GROUPS } from '@/components/ui/EmojiPicker'
 
@@ -20,7 +19,6 @@ export default function SettingsClient({ userId, displayName, avatarEmoji }: Pro
 
   const [yourName, setYourName] = useState(displayName)
   const [emoji, setEmoji] = useState(avatarEmoji)
-  const [signingOut, setSigningOut] = useState(false)
 
   async function saveYourName() {
     const trimmed = yourName.trim()
@@ -34,14 +32,6 @@ export default function SettingsClient({ userId, displayName, avatarEmoji }: Pro
     setEmoji(val)
     const supabase = createClient()
     await supabase.from('profiles').update({ avatar_emoji: val }).eq('id', userId)
-    router.refresh()
-  }
-
-  async function handleSignOut() {
-    setSigningOut(true)
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/auth')
     router.refresh()
   }
 
@@ -78,21 +68,6 @@ export default function SettingsClient({ userId, displayName, avatarEmoji }: Pro
             fallback="🙂"
             searchPlaceholder="Search avatar emojis…"
           />
-        </div>
-
-        <div style={{ paddingTop: 8, paddingBottom: 8 }}>
-          <Button
-            variant="outline"
-            onClick={handleSignOut}
-            disabled={signingOut}
-            style={{
-              display: 'flex', padding: '14px 16px',
-              border: '1.5px solid var(--divider)', background: 'var(--surface)',
-              color: 'var(--red)', fontWeight: 700,
-            }}
-          >
-            {signingOut ? 'Signing out…' : 'Sign out'}
-          </Button>
         </div>
 
       </div>
