@@ -43,15 +43,7 @@ export default function ChefAddMenu() {
           onMouseEnter={e => (e.currentTarget.style.background = 'oklch(96% 0.006 85)')}
           onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
         >
-          Import Recipe from URL
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          disabled
-          className="text-sm flex flex-col items-start gap-0"
-          style={{ cursor: 'not-allowed' }}
-        >
-          <span>Scan a Recipe</span>
-          <span className="text-11" style={{ color: 'var(--muted)' }}>Coming soon</span>
+          Import Recipe
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
