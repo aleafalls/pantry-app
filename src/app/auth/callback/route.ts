@@ -4,12 +4,14 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
+  const inviteCode = searchParams.get('invite_code')
 
   if (code) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      return NextResponse.redirect(`${origin}/`)
+      const dest = inviteCode ? `/join?code=${encodeURIComponent(inviteCode)}` : '/'
+      return NextResponse.redirect(`${origin}${dest}`)
     }
     // Surface the real reason instead of silently bouncing back to a blank
     // sign-in form — most commonly a PKCE code-verifier cookie that didn't

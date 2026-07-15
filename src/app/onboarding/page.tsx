@@ -57,6 +57,16 @@ export default function OnboardingPage() {
   async function handleNameSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!displayName.trim()) return
+    setLoading(true)
+    setError('')
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/auth'); return }
+    // Save the name now (not just in local state) so it survives navigating
+    // away to /join — otherwise joining a household re-prompts for it.
+    const { error } = await supabase.from('profiles').upsert({ id: user.id, display_name: displayName.trim() })
+    if (error) { setError(`Profile error: ${error.message}`); setLoading(false); return }
+    setLoading(false)
     setStep('household')
   }
 
@@ -232,9 +242,10 @@ export default function OnboardingPage() {
               className="rounded-xl text-sm"
               style={{ color: 'var(--foreground)' }}
             />
-            <Button type="submit" variant="brand" disabled={!displayName.trim()}
+            {error && <p style={{ fontSize: 13, color: 'var(--red)', margin: 0 }}>{error}</p>}
+            <Button type="submit" variant="brand" disabled={loading || !displayName.trim()}
               style={{ background: 'linear-gradient(150deg, var(--yellow-light), var(--yellow))', color: '#4A3300', padding: '14px 16px', fontWeight: 700 }}>
-              Continue
+              {loading ? 'Saving…' : 'Continue'}
             </Button>
           </form>
         ) : (

@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import OnboardingTour from '@/components/onboarding/OnboardingTour'
 
 // Same floating cards as onboarding but reordered/reused
 const FLOATING_CARDS: {
@@ -53,32 +54,130 @@ const BOTTOM_CARD: React.CSSProperties = {
   boxShadow: 'oklch(1 0 0 / 0.7) 0px 0px 0px inset, oklch(0.3 0.02 85 / 0.25) 0px 8px 32px -8px',
 }
 
+type Household = { id: string; name: string }
+type Step = 'checking' | 'tour' | 'code' | 'sendEmail' | 'checkEmail' | 'name'
+
 function JoinForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [code, setCode] = useState(searchParams.get('code') ?? '')
+  const [email, setEmail] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [step, setStep] = useState<'code' | 'name'>('code')
-  const [household, setHousehold] = useState<{ id: string; name: string } | null>(null)
+  const [step, setStep] = useState<Step>('checking')
+  const [household, setHousehold] = useState<Household | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // On load: if we arrived with a code (either from the invite link, or
+  // bounced back here from the magic-link email via /auth/callback), resolve
+  // it once and skip straight past whatever steps are already satisfied —
+  // no re-entering the code, and no re-entering a name that's already set.
+  // First-time (unauthenticated) visitors see the app tour before anything
+  // else; returning from the magic-link email skips it, since they already saw it.
+  useEffect(() => {
+    let cancelled = false
+    async function init() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (cancelled) return
+
+      const initialCode = searchParams.get('code')
+      let hh: Household | null = null
+      if (initialCode) {
+        const normalizedCode = initialCode.trim().toUpperCase()
+        const { data } = await supabase
+          .rpc('get_household_by_invite_code', { p_invite_code: normalizedCode })
+          .single()
+        if (cancelled) return
+        if (data) {
+          hh = data as Household
+          setHousehold(hh)
+          setCode(normalizedCode)
+        } else {
+          setError("That code doesn't match any household. Double-check it and try again.")
+        }
+      }
+
+      if (!user) {
+        setStep('tour')
+        return
+      }
+
+      if (!hh) { setStep('code'); return }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', user.id)
+        .single()
+      if (cancelled) return
+
+      if (profile?.display_name) {
+        await supabase.from('profiles').update({ household_id: hh.id }).eq('id', user.id)
+        router.push('/')
+        router.refresh()
+        return
+      }
+      setStep('name')
+    }
+    init()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+  }, [])
+
+  function handleTourDone() {
+    setStep(household ? 'sendEmail' : 'code')
+  }
 
   async function handleCodeSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
     const supabase = createClient()
+    const normalizedCode = code.trim().toUpperCase()
     const { data, error } = await supabase
-      .rpc('get_household_by_invite_code', { p_invite_code: code.trim().toUpperCase() })
+      .rpc('get_household_by_invite_code', { p_invite_code: normalizedCode })
       .single()
     if (error || !data) {
       setError("That code doesn't match any household. Double-check it and try again.")
       setLoading(false)
       return
     }
-    setHousehold(data as { id: string; name: string })
-    setStep('name')
+    setCode(normalizedCode)
+    setHousehold(data as Household)
     setLoading(false)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      setStep('sendEmail')
+      return
+    }
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', user.id)
+      .single()
+    if (profile?.display_name) {
+      await supabase.from('profiles').update({ household_id: (data as Household).id }).eq('id', user.id)
+      router.push('/')
+      router.refresh()
+      return
+    }
+    setStep('name')
+  }
+
+  async function handleSendEmail(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    const supabase = createClient()
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback?invite_code=${encodeURIComponent(code.trim().toUpperCase())}` },
+    })
+    if (error) { setError(error.message); setLoading(false); return }
+    setLoading(false)
+    setStep('checkEmail')
   }
 
   async function handleJoin(e: React.FormEvent) {
@@ -138,7 +237,24 @@ function JoinForm() {
 
       {/* Bottom card */}
       <div style={BOTTOM_CARD}>
-        {step === 'code' ? (
+        {step === 'checking' ? (
+          <div style={{ textAlign: 'center', padding: '24px 0' }}>
+            <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0 }}>Loading…</p>
+          </div>
+        ) : step === 'tour' ? (
+          <>
+            <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={handleTourDone}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--muted)', fontFamily: 'inherit', padding: 0 }}
+              >
+                Skip
+              </button>
+            </div>
+            <OnboardingTour onDone={handleTourDone} />
+          </>
+        ) : step === 'code' ? (
           <>
             <div style={{ marginBottom: 20 }}>
               <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 6px', color: 'var(--foreground)', letterSpacing: '-0.01em' }}>
@@ -171,6 +287,60 @@ function JoinForm() {
               </a>
             </form>
           </>
+        ) : step === 'sendEmail' ? (
+          <>
+            <div style={{ marginBottom: 20 }}>
+              <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 6px', color: 'var(--foreground)', letterSpacing: '-0.01em' }}>
+                Join {household?.name}
+              </h1>
+              <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
+                Enter your email to set up your account.
+              </p>
+            </div>
+            <form onSubmit={handleSendEmail} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <Label htmlFor="email" style={{ color: 'var(--foreground)' }}>Email</Label>
+              <Input
+                id="email"
+                type="email"
+                required
+                autoFocus
+                placeholder="you@example.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="rounded-xl text-sm"
+                style={{ color: 'var(--foreground)' }}
+              />
+              {error && <p style={{ fontSize: 13, color: 'var(--red)', margin: 0 }}>{error}</p>}
+              <Button type="submit" variant="brand" disabled={loading || !email.trim()}
+                style={{ background: 'linear-gradient(150deg, var(--yellow-light), var(--yellow))', color: '#4A3300', padding: '14px 16px', fontWeight: 700 }}>
+                {loading ? 'Sending…' : 'Send magic link'}
+              </Button>
+              <button type="button" onClick={() => setStep('code')}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--muted)', fontFamily: 'inherit', padding: 0, display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
+                <i className="fi-rr-angle-left" style={{ fontSize: 12, display: 'block', lineHeight: 1 }} />
+                Back
+              </button>
+            </form>
+          </>
+        ) : step === 'checkEmail' ? (
+          <div style={{ textAlign: 'center', padding: '8px 0' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>📬</div>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--foreground)', marginBottom: 6 }}>
+              Check your email
+            </h2>
+            <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.5 }}>
+              We sent a sign-in link to <strong>{email}</strong>. Tap it to finish joining {household?.name} — no need to re-enter anything.
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--muted-light)', marginTop: 8 }}>
+              Didn&apos;t get it? Check your spam or{' '}
+              <button
+                onClick={() => setStep('sendEmail')}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--amber)', fontWeight: 700, fontFamily: 'inherit', padding: 0 }}
+              >
+                try again
+              </button>
+            </p>
+          </div>
         ) : (
           <>
             <div style={{ marginBottom: 20 }}>
@@ -199,11 +369,6 @@ function JoinForm() {
                 style={{ background: 'linear-gradient(150deg, var(--yellow-light), var(--yellow))', color: '#4A3300', padding: '14px 16px', fontWeight: 700 }}>
                 {loading ? 'Joining…' : 'Join household'}
               </Button>
-              <button type="button" onClick={() => setStep('code')}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--muted)', fontFamily: 'inherit', padding: 0, display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
-                <i className="fi-rr-angle-left" style={{ fontSize: 12, display: 'block', lineHeight: 1 }} />
-                Back
-              </button>
             </form>
           </>
         )}
