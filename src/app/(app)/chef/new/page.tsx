@@ -38,6 +38,7 @@ export default function NewRecipePage() {
   const [instructions, setInstructions] = useState('')
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [sourceUrl, setSourceUrl] = useState<string | null>(null)
+  const [source, setSource] = useState<'manual' | 'web' | 'photo'>('manual')
 
   const [loading, setLoading] = useState(false)
   const [householdId, setHouseholdId] = useState<string | null>(null)
@@ -72,6 +73,7 @@ export default function NewRecipePage() {
     setInstructions(draft.instructions)
     setImageUrl(draft.imageUrl)
     setSourceUrl(draft.sourceUrl)
+    setSource(draft.source)
   }, [])
 
   const isValid = name.trim() && ingredients.length > 0
@@ -93,7 +95,7 @@ export default function NewRecipePage() {
         emoji,
         course_type: courseType || null,
         tags,
-        source: sourceUrl ? 'web' : 'manual',
+        source,
         source_url: sourceUrl,
         image_url: imageUrl,
         servings,
