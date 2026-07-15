@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import type { InventoryItem } from '@/lib/chefData'
 import { parseLeadingQuantity } from '@/lib/quantity'
@@ -10,6 +11,7 @@ export interface PlannerIngredient {
   name: string
   quantity: string | null
   unit: string | null
+  canonical_name?: string | null
 }
 
 interface Props {
@@ -26,19 +28,52 @@ interface IngredientMatch {
   itemId: string
 }
 
-function matchIngredient(name: string, inventory: InventoryItem[]): IngredientMatch | null {
-  const norm = name.trim().toLowerCase()
-  const rows = inventory.filter(inv => inv.name.trim().toLowerCase() === norm)
+function matchIngredient(ing: PlannerIngredient, inventory: InventoryItem[]): IngredientMatch | null {
+  const norm = ing.name.trim().toLowerCase()
+  const canonicalNorm = ing.canonical_name?.trim().toLowerCase()
+  const rows = inventory.filter(inv => {
+    if (canonicalNorm && inv.canonicalName) {
+      return inv.canonicalName.trim().toLowerCase() === canonicalNorm
+    }
+    return inv.name.trim().toLowerCase() === norm
+  })
   if (rows.length === 0) return null
   const total = rows.reduce((sum, r) => sum + r.quantity, 0)
   const primary = rows.reduce((a, b) => (b.quantity >= a.quantity ? b : a))
   return { rows, total, unit: primary.unit, itemId: primary.itemId }
 }
 
+// Spreads a new total across the rows an ingredient matched to, instead of
+// dumping the whole delta on one row. Increases go to the largest row;
+// decreases drain from the largest row down so no row goes negative and no
+// quantity gets silently dropped.
+function distributeStockUpdate(rows: InventoryItem[], newTotal: number): Array<{ id: string; quantity: number }> {
+  const sorted = [...rows].sort((a, b) => b.quantity - a.quantity)
+  const currentTotal = sorted.reduce((sum, r) => sum + r.quantity, 0)
+  const updates: Array<{ id: string; quantity: number }> = []
+
+  if (newTotal >= currentTotal) {
+    const delta = newTotal - currentTotal
+    if (delta > 0) updates.push({ id: sorted[0].id, quantity: sorted[0].quantity + delta })
+    return updates
+  }
+
+  let remaining = currentTotal - newTotal
+  for (const row of sorted) {
+    if (remaining <= 0) break
+    const take = Math.min(row.quantity, remaining)
+    if (take > 0) {
+      updates.push({ id: row.id, quantity: row.quantity - take })
+      remaining -= take
+    }
+  }
+  return updates
+}
+
 export default function IngredientStockPlanner({ ingredients, inventory, householdId, userId }: Props) {
   const matches = useMemo(() => {
     const map = new Map<string, IngredientMatch | null>()
-    for (const ing of ingredients) map.set(ing.name, matchIngredient(ing.name, inventory))
+    for (const ing of ingredients) map.set(ing.name, matchIngredient(ing, inventory))
     return map
     // eslint-disable-next-line react-hooks/exhaustive-deps -- ingredients/inventory are stable per page load
   }, [])
@@ -101,14 +136,28 @@ export default function IngredientStockPlanner({ ingredients, inventory, househo
     const unit = ing.unit ?? undefined
     const supabase = createClient()
 
-    if (itemId) {
-      const { count } = await supabase.from('shopping_list')
-        .select('id', { count: 'exact', head: true })
-        .eq('item_id', itemId).eq('status', 'pending')
-      if (!count) {
-        await supabase.from('shopping_list').insert({
+    try {
+      if (itemId) {
+        const { count } = await supabase.from('shopping_list')
+          .select('id', { count: 'exact', head: true })
+          .eq('item_id', itemId).eq('status', 'pending')
+        if (!count) {
+          const { error } = await supabase.from('shopping_list').insert({
+            household_id: householdId,
+            item_id: itemId,
+            item_name: ing.name,
+            reason: 'recipe',
+            status: 'pending',
+            added_by: userId,
+            quantity,
+            unit,
+          })
+          if (error) throw error
+        }
+      } else {
+        const { error } = await supabase.from('shopping_list').insert({
           household_id: householdId,
-          item_id: itemId,
+          item_id: null,
           item_name: ing.name,
           reason: 'recipe',
           status: 'pending',
@@ -116,63 +165,60 @@ export default function IngredientStockPlanner({ ingredients, inventory, househo
           quantity,
           unit,
         })
+        if (error) throw error
       }
-    } else {
-      await supabase.from('shopping_list').insert({
-        household_id: householdId,
-        item_id: null,
-        item_name: ing.name,
-        reason: 'recipe',
-        status: 'pending',
-        added_by: userId,
-        quantity,
-        unit,
-      })
+      setAddedToList(prev => new Set(prev).add(ing.name))
+    } catch {
+      toast.error(`Couldn't add ${ing.name} to the list — try again.`)
     }
-    setAddedToList(prev => new Set(prev).add(ing.name))
   }
 
   async function handleAddAllToList() {
     setAddingAll(true)
-    await Promise.all(
-      neededIngredients
-        .filter(ing => !addedToList.has(ing.name))
-        .map(ing => handleAddToList(ing))
-    )
-    setAddingAll(false)
+    try {
+      await Promise.all(
+        neededIngredients
+          .filter(ing => !addedToList.has(ing.name))
+          .map(ing => handleAddToList(ing))
+      )
+    } finally {
+      setAddingAll(false)
+    }
   }
 
   async function handleUpdateStock() {
     setUpdating(true)
     const supabase = createClient()
     const today = new Date().toISOString().split('T')[0]
+    let hadError = false
 
-    await Promise.all(Object.keys(baselineQty).map(async name => {
-      const match = matches.get(name)
-      const newQty = pendingQty[name]
-      if (!match || newQty === baselineQty[name]) return
-      const isIncrease = newQty > match.total
+    try {
+      await Promise.all(Object.keys(baselineQty).map(async name => {
+        const match = matches.get(name)
+        const newQty = pendingQty[name]
+        if (!match || newQty === baselineQty[name]) return
+        const isIncrease = newQty > match.total
 
-      if (match.rows.length === 1) {
-        await supabase.from('inventory').update({
-          quantity: newQty,
-          added_by: userId,
-          ...(isIncrease ? { purchase_date: today } : {}),
-        }).eq('id', match.rows[0].id)
-      } else {
-        const primary = match.rows.reduce((a, b) => (b.quantity >= a.quantity ? b : a))
-        const delta = newQty - match.total
-        const adjusted = Math.max(0, primary.quantity + delta)
-        await supabase.from('inventory').update({
-          quantity: adjusted,
-          added_by: userId,
-          ...(isIncrease ? { purchase_date: today } : {}),
-        }).eq('id', primary.id)
-      }
-    }))
+        const rowUpdates = distributeStockUpdate(match.rows, newQty)
+        const results = await Promise.all(rowUpdates.map(({ id, quantity }) =>
+          supabase.from('inventory').update({
+            quantity,
+            added_by: userId,
+            ...(isIncrease ? { purchase_date: today } : {}),
+          }).eq('id', id)
+        ))
+        if (results.some(r => r.error)) hadError = true
+      }))
+    } catch {
+      hadError = true
+    }
 
-    setBaselineQty({ ...pendingQty })
     setUpdating(false)
+    if (hadError) {
+      toast.error("Couldn't update stock — try again.")
+      return
+    }
+    setBaselineQty({ ...pendingQty })
     setJustUpdated(true)
     setTimeout(() => setJustUpdated(false), 2000)
   }

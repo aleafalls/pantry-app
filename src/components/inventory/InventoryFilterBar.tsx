@@ -11,13 +11,29 @@ interface Props {
   tagFilters: string[]
   onTagFiltersChange: (values: string[]) => void
   tagOptions: string[]
+  stockFilters: string[]
+  onStockFiltersChange: (values: string[]) => void
 }
 
 const locationOptions: SelectOption[] = LOCATIONS.map(l => ({ value: l.value, label: `${l.emoji} ${l.label}` }))
 const categoryOptions: SelectOption[] = CATEGORIES.map(c => ({ value: c, label: c }))
+const stockOptions: SelectOption[] = [
+  { value: 'out', label: 'Out' },
+  { value: 'low', label: 'Low' },
+  { value: 'full', label: 'Fully Stocked' },
+]
 
-export function FilterChip({ label, count, onClick }: { label: string; count: number; onClick: () => void }) {
-  const active = count > 0
+// Out-of-stock items are hidden until the user opts in — this is the "off" state for the Stock chip.
+export const DEFAULT_STOCK_FILTERS = ['low', 'full']
+
+function sameFilterSet(a: string[], b: string[]) {
+  if (a.length !== b.length) return false
+  const sortedB = [...b].sort()
+  return [...a].sort().every((v, i) => v === sortedB[i])
+}
+
+export function FilterChip({ label, count, active, onClick }: { label: string; count: number; active?: boolean; onClick: () => void }) {
+  const isActive = active ?? count > 0
   return (
     <button
       type="button"
@@ -27,16 +43,16 @@ export function FilterChip({ label, count, onClick }: { label: string; count: nu
         flexShrink: 0,
         padding: '7px 14px',
         borderRadius: 99,
-        fontWeight: active ? 700 : 500,
+        fontWeight: isActive ? 700 : 500,
         cursor: 'pointer',
-        border: active ? '2px solid var(--yellow)' : '1px solid var(--divider)',
-        background: active ? 'var(--yellow-light)' : 'rgb(234, 230, 222)',
-        color: active ? '#4A3300' : 'var(--foreground)',
+        border: isActive ? '2px solid var(--yellow)' : '1px solid var(--divider)',
+        background: isActive ? 'var(--yellow-light)' : 'rgb(234, 230, 222)',
+        color: isActive ? '#4A3300' : 'var(--foreground)',
         fontFamily: 'inherit',
       }}
     >
       {label}
-      {active && (
+      {isActive && (
         <span
           className="inline-flex items-center justify-center text-11 font-extrabold"
           style={{
@@ -47,7 +63,7 @@ export function FilterChip({ label, count, onClick }: { label: string; count: nu
           {count}
         </span>
       )}
-      <i className="fi-rr-angle-down" style={{ fontSize: 11, display: 'block', lineHeight: 1, color: active ? '#4A3300' : 'var(--muted)' }} />
+      <i className="fi-rr-angle-down" style={{ fontSize: 11, display: 'block', lineHeight: 1, color: isActive ? '#4A3300' : 'var(--muted)' }} />
     </button>
   )
 }
@@ -57,9 +73,10 @@ export default function InventoryFilterBar({
   categoryFilters, onCategoryFiltersChange,
   tagFilters, onTagFiltersChange,
   tagOptions,
+  stockFilters, onStockFiltersChange,
 }: Props) {
   return (
-    <div className="no-scrollbar" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+    <div className="no-scrollbar -mx-5 px-5" style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
       <DrawerSelect
         title="Location"
         multiple
@@ -83,6 +100,21 @@ export default function InventoryFilterBar({
         onChangeMultiple={onTagFiltersChange}
         options={tagOptions.map(t => ({ value: t, label: t }))}
         renderTrigger={open => <FilterChip label="Tags" count={tagFilters.length} onClick={open} />}
+      />
+      <DrawerSelect
+        title="Stock"
+        multiple
+        values={stockFilters}
+        onChangeMultiple={onStockFiltersChange}
+        options={stockOptions}
+        renderTrigger={open => (
+          <FilterChip
+            label="Stock"
+            count={stockFilters.length}
+            active={!sameFilterSet(stockFilters, DEFAULT_STOCK_FILTERS)}
+            onClick={open}
+          />
+        )}
       />
     </div>
   )

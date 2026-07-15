@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import InventoryFilterBar from '@/components/inventory/InventoryFilterBar'
+import InventoryFilterBar, { DEFAULT_STOCK_FILTERS } from '@/components/inventory/InventoryFilterBar'
 import InventoryItemRow from '@/components/inventory/InventoryItemRow'
 import { LOCATIONS } from '@/lib/constants'
 import AppBackground from '@/components/layout/AppBackground'
@@ -23,6 +23,7 @@ interface AggregatedItem {
   primaryLocation: string
   isLow: boolean
   isCritical: boolean
+  stockStatus: 'out' | 'low' | 'full'
 }
 
 interface InventoryRow {
@@ -58,6 +59,7 @@ export default function InventoryPage() {
   const [locationFilters, setLocationFilters] = useState<string[]>([])
   const [categoryFilters, setCategoryFilters] = useState<string[]>([])
   const [tagFilters, setTagFilters] = useState<string[]>([])
+  const [stockFilters, setStockFilters] = useState<string[]>(DEFAULT_STOCK_FILTERS)
   const [allItems, setAllItems] = useState<AggregatedItem[]>([])
   const [loading, setLoading] = useState(true)
   const [householdId, setHouseholdId] = useState<string | null>(null)
@@ -111,6 +113,7 @@ export default function InventoryPage() {
           primaryLocation: row.location,
           isLow: row.manual_low_flag,
           isCritical: false,
+          stockStatus: 'full',
         })
       }
     }
@@ -120,6 +123,7 @@ export default function InventoryPage() {
       const threshold = (data as unknown as InventoryRow[]).find(r => r.items.id === agg.itemId)?.items.low_threshold ?? 2
       if (agg.totalQty === 0) agg.isCritical = true
       else if (agg.totalQty <= threshold) agg.isLow = true
+      agg.stockStatus = agg.isCritical ? 'out' : agg.isLow ? 'low' : 'full'
     }
 
     setAllItems(Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name)))
@@ -167,7 +171,8 @@ export default function InventoryPage() {
     const matchesLocation = locationFilters.length === 0 || locationFilters.some(loc => item.locations.includes(loc))
     const matchesCategory = categoryFilters.length === 0 || categoryFilters.includes(item.category)
     const matchesTags = tagFilters.length === 0 || tagFilters.some(tag => item.tags.includes(tag))
-    return matchesSearch && matchesLocation && matchesCategory && matchesTags
+    const matchesStock = stockFilters.includes(item.stockStatus)
+    return matchesSearch && matchesLocation && matchesCategory && matchesTags && matchesStock
   })
 
   // Group by primary location when no location filter is active
@@ -233,6 +238,8 @@ export default function InventoryPage() {
           tagFilters={tagFilters}
           onTagFiltersChange={setTagFilters}
           tagOptions={tagOptions}
+          stockFilters={stockFilters}
+          onStockFiltersChange={setStockFilters}
         />
       </div>
 

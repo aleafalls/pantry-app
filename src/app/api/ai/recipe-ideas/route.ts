@@ -15,7 +15,7 @@ const RecipeIdeaSchema = z.object({
   emoji: z.string().describe('A single emoji that best represents this specific dish'),
   description: z.string().describe('1 sentence'),
   servings: z.number(),
-  instructions: z.string(),
+  instructions: z.array(z.string()).describe('Ordered cooking steps, one instruction per array entry. Do not include step numbers or bullets in the text — the UI numbers them.'),
   ingredients: z.array(RecipeIngredientSchema),
 })
 

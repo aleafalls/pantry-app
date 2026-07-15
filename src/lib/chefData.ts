@@ -5,16 +5,24 @@ export interface InventoryItem {
   id: string
   itemId: string
   name: string
+  canonicalName: string | null
   quantity: number
   unit: string
   category: string
   location: string
 }
 
+export interface ChefPreferences {
+  dietaryRestrictions: string[]
+  favoriteCuisines: string[]
+  macroGoals: string[]
+}
+
 export interface ChefContext {
   inventory: InventoryItem[]
   priorityItems: string[]
   defaultServings: number
+  preferences: ChefPreferences
 }
 
 /**
@@ -27,10 +35,10 @@ export interface ChefContext {
  * so a wilting vegetable outranks a can of beans bought the same day.
  */
 export async function getChefContext(supabase: SupabaseClient, householdId: string): Promise<ChefContext> {
-  const [{ data: inventoryRows }, { data: household }] = await Promise.all([
+  const [{ data: inventoryRows }, { data: household }, { data: preferencesRow }] = await Promise.all([
     supabase
       .from('inventory')
-      .select('id, item_id, quantity, unit, location, purchase_date, items!inner(name, category, active)')
+      .select('id, item_id, quantity, unit, location, purchase_date, items!inner(name, category, active, canonical_name)')
       .eq('household_id', householdId)
       .eq('items.active', true),
     supabase
@@ -38,17 +46,23 @@ export async function getChefContext(supabase: SupabaseClient, householdId: stri
       .select('default_servings')
       .eq('id', householdId)
       .single(),
+    supabase
+      .from('household_preferences')
+      .select('dietary_restrictions, favorite_cuisines, macro_goals')
+      .eq('household_id', householdId)
+      .maybeSingle(),
   ])
 
   const rows = (inventoryRows ?? []) as unknown as {
     id: string; item_id: string; quantity: number; unit: string; location: string; purchase_date: string | null
-    items: { name: string; category: string }
+    items: { name: string; category: string; canonical_name: string | null }
   }[]
 
   const inventory: InventoryItem[] = rows.map(r => ({
     id: r.id,
     itemId: r.item_id,
     name: r.items.name,
+    canonicalName: r.items.canonical_name,
     quantity: r.quantity,
     unit: r.unit,
     category: r.items.category,
@@ -75,5 +89,10 @@ export async function getChefContext(supabase: SupabaseClient, householdId: stri
     inventory,
     priorityItems,
     defaultServings: household?.default_servings ?? 2,
+    preferences: {
+      dietaryRestrictions: preferencesRow?.dietary_restrictions ?? [],
+      favoriteCuisines: preferencesRow?.favorite_cuisines ?? [],
+      macroGoals: preferencesRow?.macro_goals ?? [],
+    },
   }
 }

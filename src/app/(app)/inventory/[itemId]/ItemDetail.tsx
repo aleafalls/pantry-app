@@ -603,13 +603,17 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 8 }}>
                   <Button
                     variant="brand"
-                    onClick={() => router.push('/inventory')}
+                    onClick={async () => {
+                      if (stockQty !== currentTotal) await handleUpdateStock()
+                      router.push('/inventory')
+                    }}
+                    disabled={updating}
                     style={{
                       background: 'linear-gradient(150deg, var(--yellow-light), var(--yellow))',
                       color: '#4A3300', padding: '14px 16px',
                     }}
                   >
-                    Save Item
+                    {updating ? 'Saving…' : 'Save Item'}
                   </Button>
 
                   {!confirmRemove ? (

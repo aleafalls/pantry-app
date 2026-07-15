@@ -92,6 +92,7 @@ export default async function DashboardPage() {
         inventory={chefContext.inventory}
         priorityItems={chefContext.priorityItems}
         defaultServings={chefContext.defaultServings}
+        preferences={chefContext.preferences}
       />
 
       {/* Decorative blobs — fixed so they sit behind the sticky header */}

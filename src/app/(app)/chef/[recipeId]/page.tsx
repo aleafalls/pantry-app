@@ -25,15 +25,16 @@ export default async function RecipeDetailPage({ params }: Props) {
 
   const { data: recipe } = await supabase
     .from('recipes')
-    .select('id, name, emoji, course_type, tags, servings, total_time_minutes, instructions')
+    .select('id, name, emoji, course_type, tags, servings, total_time_minutes, instructions, source_url, image_url')
     .eq('id', recipeId)
+    .eq('household_id', profile.household_id)
     .single()
 
   if (!recipe) notFound()
 
   const { data: ingredients } = await supabase
     .from('recipe_ingredients')
-    .select('id, name, quantity, unit')
+    .select('id, name, quantity, unit, canonical_name, category, is_staple')
     .eq('recipe_id', recipeId)
     .order('name')
 

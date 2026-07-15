@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
+import AccountMenu from '@/components/layout/AccountMenu'
 
 const AVATAR_COLORS = [
   { bg: '#FFD333', text: '#4A3300' },
@@ -46,6 +46,7 @@ interface Props {
 
 export default function DashboardHeader({ householdName, members }: Props) {
   const [phrase] = useState(getDailyPhrase)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   return (
     <header
@@ -110,15 +111,23 @@ export default function DashboardHeader({ householdName, members }: Props) {
               </div>
             )
             return i === 0 ? (
-              <Link key={i} href="/settings" style={{ textDecoration: 'none' }} aria-label="Settings">
+              <button
+                key={i}
+                type="button"
+                onClick={() => setMenuOpen(true)}
+                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                aria-label="Account menu"
+              >
                 {avatar}
-              </Link>
+              </button>
             ) : (
               <div key={i}>{avatar}</div>
             )
           })}
         </div>
       </div>
+
+      <AccountMenu open={menuOpen} onOpenChange={setMenuOpen} />
     </header>
   )
 }

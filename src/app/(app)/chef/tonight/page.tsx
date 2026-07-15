@@ -26,6 +26,7 @@ export default async function ChefTonightPage() {
         inventory={context.inventory}
         priorityItems={context.priorityItems}
         defaultServings={context.defaultServings}
+        preferences={context.preferences}
         householdId={profile.household_id}
         userId={user.id}
       />

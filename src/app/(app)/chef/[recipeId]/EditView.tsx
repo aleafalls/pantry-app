@@ -14,6 +14,7 @@ import QuantityStepper from '@/components/add/QuantityStepper'
 import TagInput from '@/components/add/TagInput'
 import IngredientRows, { type RecipeIngredientRow } from '@/components/chef/IngredientRows'
 import { COURSE_TYPES } from '@/lib/constants'
+import { canonicalizeIngredients } from '@/lib/ingredientCanonicalize'
 import type { RecipeData, RecipeIngredientData } from './RecipeTabs'
 
 const glassField = {
@@ -25,10 +26,11 @@ const glassField = {
 interface Props {
   recipe: RecipeData
   ingredients: RecipeIngredientData[]
+  householdId: string
   onSaved: () => void
 }
 
-export default function EditView({ recipe, ingredients: initialIngredients, onSaved }: Props) {
+export default function EditView({ recipe, ingredients: initialIngredients, householdId, onSaved }: Props) {
   const router = useRouter()
 
   const [name, setName] = useState(recipe.name)
@@ -41,6 +43,7 @@ export default function EditView({ recipe, ingredients: initialIngredients, onSa
     initialIngredients.map(ing => ({ name: ing.name, quantity: ing.quantity ?? '', unit: ing.unit ?? '' }))
   )
   const [instructions, setInstructions] = useState(recipe.instructions ?? '')
+  const [imageUrl, setImageUrl] = useState(recipe.image_url)
 
   const [saving, setSaving] = useState(false)
   const [removing, setRemoving] = useState(false)
@@ -65,18 +68,24 @@ export default function EditView({ recipe, ingredients: initialIngredients, onSa
         servings,
         total_time_minutes: totalTimeMinutes || null,
         instructions: instructions.trim() || null,
-      }).eq('id', recipe.id)
+        image_url: imageUrl,
+      }).eq('id', recipe.id).eq('household_id', householdId)
       if (recipeError) throw new Error(recipeError.message)
 
       const { error: deleteError } = await supabase.from('recipe_ingredients').delete().eq('recipe_id', recipe.id)
       if (deleteError) throw new Error(deleteError.message)
 
+      const canonicalized = await canonicalizeIngredients(ingredients.map(ing => ing.name))
+
       const { error: insertError } = await supabase.from('recipe_ingredients').insert(
-        ingredients.map(ing => ({
+        ingredients.map((ing, i) => ({
           recipe_id: recipe.id,
           name: ing.name,
           quantity: ing.quantity || null,
           unit: ing.unit || null,
+          canonical_name: canonicalized[i]?.canonicalName ?? null,
+          category: canonicalized[i]?.category ?? null,
+          is_staple: canonicalized[i]?.isStaple ?? false,
         }))
       )
       if (insertError) throw new Error(insertError.message)
@@ -102,7 +111,7 @@ export default function EditView({ recipe, ingredients: initialIngredients, onSa
   async function handleDelete() {
     setRemoving(true)
     const supabase = createClient()
-    const { error } = await supabase.from('recipes').delete().eq('id', recipe.id)
+    const { error } = await supabase.from('recipes').delete().eq('id', recipe.id).eq('household_id', householdId)
     if (error) {
       toast.error(error.message)
       setRemoving(false)
@@ -128,6 +137,26 @@ export default function EditView({ recipe, ingredients: initialIngredients, onSa
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {imageUrl && (
+        <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', height: 200 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- external/user-supplied recipe photo URL, not a local/static asset */}
+          <img src={imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          <button
+            type="button"
+            onClick={() => setImageUrl(null)}
+            aria-label="Remove photo"
+            style={{
+              position: 'absolute', top: 8, right: 8,
+              width: 28, height: 28, borderRadius: '50%', border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'oklch(20% 0 0 / 0.55)', color: '#fff',
+            }}
+          >
+            <i className="fi-rr-cross-small" style={{ fontSize: 14, display: 'block' }} />
+          </button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <Input

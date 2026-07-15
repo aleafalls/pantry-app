@@ -11,13 +11,29 @@ export default function CookView({ recipe, ingredients }: Props) {
     .map(s => s.trim())
     .filter(Boolean)
 
+  const metaPills = (
+    <>
+      {recipe.course_type && <MetaPill label={recipe.course_type} />}
+      {recipe.servings && <MetaPill label={`${recipe.servings} servings`} />}
+      {recipe.total_time_minutes && <MetaPill label={`${recipe.total_time_minutes} min`} />}
+    </>
+  )
+
   return (
     <div className="flex flex-col gap-7">
-      <div className="flex gap-2 flex-wrap">
-        {recipe.course_type && <MetaPill label={recipe.course_type} />}
-        {recipe.servings && <MetaPill label={`${recipe.servings} servings`} />}
-        {recipe.total_time_minutes && <MetaPill label={`${recipe.total_time_minutes} min`} />}
-      </div>
+      {recipe.image_url ? (
+        <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', height: 200 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- external/user-supplied recipe photo URL, not a local/static asset */}
+          <img src={recipe.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          <div className="flex gap-2 flex-wrap" style={{ position: 'absolute', left: 8, right: 8, bottom: 8 }}>
+            {metaPills}
+          </div>
+        </div>
+      ) : (
+        <div className="flex gap-2 flex-wrap">
+          {metaPills}
+        </div>
+      )}
 
       <div>
         <p className="text-13 font-extrabold uppercase tracking-003 mb-3" style={{ color: 'var(--muted)' }}>
@@ -51,6 +67,19 @@ export default function CookView({ recipe, ingredients }: Props) {
             ))}
           </ol>
         </div>
+      )}
+
+      {recipe.source_url && (
+        <a
+          href={recipe.source_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-105 font-semibold"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start', color: 'var(--amber)', textDecoration: 'none' }}
+        >
+          View original recipe
+          <i className="fi-rr-arrow-up-right-from-square" style={{ fontSize: 11, display: 'block' }} />
+        </a>
       )}
     </div>
   )

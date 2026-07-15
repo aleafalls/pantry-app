@@ -1,9 +1,10 @@
-import type { InventoryItem } from './chefData'
+import type { ChefPreferences, InventoryItem } from './chefData'
 
 export interface SuggestionIngredient {
   name: string
   emoji: string
   is_main: boolean
+  is_staple: boolean
 }
 
 export interface Suggestion {
@@ -18,6 +19,7 @@ export interface TonightParams {
   priorityItems: string[]
   defaultServings: number
   allowShopping: boolean
+  preferences?: ChefPreferences
 }
 
 // Module-level so it survives Next.js client-side navigation — a request
@@ -48,6 +50,11 @@ async function requestSuggestions(params: TonightParams): Promise<Suggestion[] |
         priority_items: params.priorityItems,
         allow_shopping: params.allowShopping,
         default_servings: params.defaultServings,
+        household_preferences: params.preferences && {
+          dietary_restrictions: params.preferences.dietaryRestrictions,
+          favorite_cuisines: params.preferences.favoriteCuisines,
+          macro_goals: params.preferences.macroGoals,
+        },
       }),
     })
     if (!res.ok) return null

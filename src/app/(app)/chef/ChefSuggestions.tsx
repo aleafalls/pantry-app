@@ -2,16 +2,17 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import type { InventoryItem } from '@/lib/chefData'
+import type { ChefPreferences, InventoryItem } from '@/lib/chefData'
 import { getCachedTonightSuggestions, getOrFetchTonightSuggestions, type Suggestion } from '@/lib/chefSuggestions'
-import { getIngredientChipColors } from '@/lib/chipColors'
 import SuggestionDetailSheet from '@/components/chef/SuggestionDetailSheet'
 import AiLoadingCard from '@/components/chef/AiLoadingCard'
+import IngredientChipRow from '@/components/chef/IngredientChipRow'
 
 interface Props {
   inventory: InventoryItem[]
   priorityItems: string[]
   defaultServings: number
+  preferences: ChefPreferences
   householdId: string
   userId: string
 }
@@ -24,7 +25,7 @@ const glassCard: React.CSSProperties = {
   boxShadow: 'oklch(1 0 0 / 0.7) 0px 0px 0px inset, oklch(0.3 0.02 85 / 0.25) 0px 4px 14px -8px',
 }
 
-export default function ChefSuggestions({ inventory, priorityItems, defaultServings, householdId, userId }: Props) {
+export default function ChefSuggestions({ inventory, priorityItems, defaultServings, preferences, householdId, userId }: Props) {
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null)
   const [error, setError] = useState(false)
   const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null)
@@ -39,7 +40,7 @@ export default function ChefSuggestions({ inventory, priorityItems, defaultServi
     if (cached) setSuggestions(cached)
 
     let cancelled = false
-    getOrFetchTonightSuggestions({ inventory, priorityItems, defaultServings, allowShopping: false })
+    getOrFetchTonightSuggestions({ inventory, priorityItems, defaultServings, allowShopping: false, preferences })
       .then(data => {
         if (cancelled) return
         if (data) setSuggestions(data)
@@ -82,30 +83,20 @@ export default function ChefSuggestions({ inventory, priorityItems, defaultServi
 
       {suggestions && suggestions.length > 0 && (
         <div className="flex flex-col gap-2">
-          {suggestions.slice(0, 2).map((s, i) => {
-            const chipColors = getIngredientChipColors(s.ingredients_used)
-            return (
-              <div
-                key={i}
-                onClick={() => setSelectedSuggestion(s)}
-                className="flex items-center gap-3 rounded-14 p-3"
-                style={{ ...glassCard, cursor: 'pointer' }}
-              >
-                <div className="flex flex-col gap-1.5" style={{ flex: 1, minWidth: 0 }}>
-                  <span className="text-13 font-bold" style={{ color: 'var(--foreground)' }}>{s.idea}</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {s.ingredients_used.map((ing, ii) => (
-                      <span key={ing.name} className="text-105 font-semibold px-1.5 py-0.5 rounded-full"
-                        style={{ background: chipColors[ii].bg, color: chipColors[ii].text }}>
-                        {ing.emoji} {ing.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <i className="fi-rr-angle-right" style={{ fontSize: 14, display: 'block', flexShrink: 0, color: 'var(--muted)' }} />
+          {suggestions.slice(0, 2).map((s, i) => (
+            <div
+              key={i}
+              onClick={() => setSelectedSuggestion(s)}
+              className="flex items-center gap-3 rounded-14 p-3"
+              style={{ ...glassCard, cursor: 'pointer' }}
+            >
+              <div className="flex flex-col gap-1.5" style={{ flex: 1, minWidth: 0 }}>
+                <span className="text-13 font-bold" style={{ color: 'var(--foreground)' }}>{s.idea}</span>
+                <IngredientChipRow ingredients={s.ingredients_used} />
               </div>
-            )
-          })}
+              <i className="fi-rr-angle-right" style={{ fontSize: 14, display: 'block', flexShrink: 0, color: 'var(--muted)' }} />
+            </div>
+          ))}
         </div>
       )}
 

@@ -26,7 +26,7 @@ export const COURSE_TYPES = [
 ]
 
 export const UNITS_GROUPED: Record<string, string[]> = {
-  'Count':           ['each', 'pair', 'pack', 'box', 'bag', 'bunch', 'loaf', 'roll'],
+  'Count':           ['each', 'pair', 'dozen', 'pack', 'box', 'bag', 'bunch', 'loaf', 'roll'],
   'Volume':          ['fl oz', 'cup', 'pint', 'quart', 'gallon', 'ml', 'L'],
   'Weight':          ['oz', 'lb', 'g', 'kg'],
   'Pantry-specific': ['can', 'jar', 'bottle', 'carton', 'pouch', 'tub', 'block', 'slice'],
@@ -39,6 +39,20 @@ export const LOCATIONS = [
   { value: 'spice_rack',        label: 'Spice Rack',        emoji: '🧂' },
   { value: 'cleaning_supplies', label: 'Cleaning Supplies', emoji: '🧽' },
   { value: 'garage_overflow',   label: 'Garage / Overflow', emoji: '🧰' },
+]
+
+export const DIETARY_RESTRICTIONS = [
+  'Vegetarian', 'Vegan', 'Gluten-free', 'Dairy-free', 'Nut-free',
+  'Shellfish-free', 'Kosher', 'Halal', 'Pescatarian', 'Keto', 'Paleo',
+]
+
+export const FAVORITE_CUISINES = [
+  'Italian', 'Mexican', 'Japanese', 'Chinese', 'Indian',
+  'Mediterranean', 'Thai', 'French', 'American comfort',
+]
+
+export const MACRO_GOALS = [
+  'High protein', 'Low carb', 'High fiber', 'Low sodium',
 ]
 
 export const US_STATES = [

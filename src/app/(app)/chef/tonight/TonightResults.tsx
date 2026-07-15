@@ -1,15 +1,16 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import type { InventoryItem } from '@/lib/chefData'
+import type { ChefPreferences, InventoryItem } from '@/lib/chefData'
 import { getCachedTonightSuggestions, getOrFetchTonightSuggestions, refetchTonightSuggestions, type Suggestion } from '@/lib/chefSuggestions'
-import { getIngredientChipColors } from '@/lib/chipColors'
 import SuggestionDetailSheet from '@/components/chef/SuggestionDetailSheet'
+import IngredientChipRow from '@/components/chef/IngredientChipRow'
 
 interface Props {
   inventory: InventoryItem[]
   priorityItems: string[]
   defaultServings: number
+  preferences: ChefPreferences
   strictOnly: boolean
   householdId: string
   userId: string
@@ -23,18 +24,23 @@ const glassCard: React.CSSProperties = {
   boxShadow: 'oklch(1 0 0 / 0.7) 0px 0px 0px inset, oklch(0.3 0.02 85 / 0.25) 0px 4px 14px -8px',
 }
 
-export default function TonightResults({ inventory, priorityItems, defaultServings, strictOnly, householdId, userId }: Props) {
+export default function TonightResults({ inventory, priorityItems, defaultServings, preferences, strictOnly, householdId, userId }: Props) {
   const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(false)
   const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null)
-  const isFirstLoad = useRef(true)
+  // Tracks the `strictOnly` value we last actually fetched for — not just
+  // whether this is the "first" effect run. A plain `isFirstLoad` boolean
+  // ref breaks under React's dev-mode Strict Mode double-invoke: the ghost
+  // second invocation sees the ref already flipped by the first, mistakes
+  // itself for a real toggle change, and fires a second, unwanted fetch.
+  const lastLoadedStrictOnly = useRef<boolean | null>(null)
 
   function loadSuggestions(allowShoppingValue: boolean, fresh: boolean, hasCached: boolean) {
     if (!hasCached) setLoading(true)
     setError(false)
-    const params = { inventory, priorityItems, defaultServings, allowShopping: allowShoppingValue }
+    const params = { inventory, priorityItems, defaultServings, allowShopping: allowShoppingValue, preferences }
     const promise = fresh ? refetchTonightSuggestions(params) : getOrFetchTonightSuggestions(params)
     promise
       .then(data => {
@@ -47,7 +53,7 @@ export default function TonightResults({ inventory, priorityItems, defaultServin
 
   function loadMoreSuggestions() {
     setLoadingMore(true)
-    const params = { inventory, priorityItems, defaultServings, allowShopping: !strictOnly }
+    const params = { inventory, priorityItems, defaultServings, allowShopping: !strictOnly, preferences }
     refetchTonightSuggestions(params)
       .then(data => {
         if (data) setSuggestions(prev => (prev ? [...prev, ...data] : data))
@@ -57,11 +63,13 @@ export default function TonightResults({ inventory, priorityItems, defaultServin
 
   useEffect(() => {
     if (inventory.length === 0) return
-    // First mount reads the Dashboard's prewarmed result (if any); every
-    // later run of this effect is a toggle change, so it forces a fresh call.
-    const wasFirstLoad = isFirstLoad.current
+
+    // Strict Mode's synthetic re-invoke re-runs this effect with the same
+    // `strictOnly` value — skip it rather than treating it as a real toggle.
+    if (lastLoadedStrictOnly.current === strictOnly) return
+    const wasFirstLoad = lastLoadedStrictOnly.current === null
     const fresh = !wasFirstLoad
-    isFirstLoad.current = false
+    lastLoadedStrictOnly.current = strictOnly
 
     // On a page revisit (first mount of this instance), render the
     // last-resolved suggestions immediately instead of flashing the
@@ -96,50 +104,33 @@ export default function TonightResults({ inventory, priorityItems, defaultServin
 
       {!loading && suggestions && suggestions.length > 0 && (
         <div className="flex flex-col gap-2">
-          {suggestions.map((s, i) => {
-            const chipColors = getIngredientChipColors(s.ingredients_used)
-            return (
-              <div
-                key={i}
-                onClick={() => setSelectedSuggestion(s)}
-                className="rounded-14 p-4 flex flex-col gap-2"
-                style={{ ...glassCard, cursor: 'pointer' }}
-              >
-                <span className="text-base font-bold" style={{ color: 'var(--foreground)' }}>{s.idea}</span>
-                <span className="text-sm" style={{ color: 'var(--muted)' }}>{s.description}</span>
+          {suggestions.map((s, i) => (
+            <div
+              key={i}
+              onClick={() => setSelectedSuggestion(s)}
+              className="rounded-14 p-4 flex flex-col gap-2"
+              style={{ ...glassCard, cursor: 'pointer' }}
+            >
+              <span className="text-base font-bold" style={{ color: 'var(--foreground)' }}>{s.idea}</span>
+              <span className="text-sm" style={{ color: 'var(--muted)' }}>{s.description}</span>
 
-                <div className="flex flex-col gap-1 mt-1">
-                  <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
-                    Uses
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {s.ingredients_used.map((ing, ii) => (
-                      <span key={ing.name} className="text-105 font-semibold px-1.5 py-0.5 rounded-full"
-                        style={{ background: chipColors[ii].bg, color: chipColors[ii].text }}>
-                        {ing.emoji} {ing.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {s.ingredients_needed.length > 0 && (
-                  <div className="flex flex-col gap-1">
-                    <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
-                      You&apos;d need
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {s.ingredients_needed.map(ing => (
-                        <span key={ing.name} className="text-105 font-semibold px-1.5 py-0.5 rounded-full"
-                          style={{ background: 'var(--surface)', border: '1px solid var(--divider)', color: 'var(--foreground)' }}>
-                          {ing.emoji} {ing.name}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+              <div className="flex flex-col gap-1 mt-1">
+                <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
+                  Uses
+                </span>
+                <IngredientChipRow ingredients={s.ingredients_used} />
               </div>
-            )
-          })}
+
+              {s.ingredients_needed.some(ing => !ing.is_staple) && (
+                <div className="flex flex-col gap-1">
+                  <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
+                    You&apos;d need
+                  </span>
+                  <IngredientChipRow ingredients={s.ingredients_needed} variant="needed" />
+                </div>
+              )}
+            </div>
+          ))}
 
           <button
             type="button"

@@ -7,6 +7,7 @@ const IngredientSchema = z.object({
   name: z.string().describe('Ingredient name — match the household inventory name when it\'s an on-hand item'),
   emoji: z.string().describe('A single emoji that best represents this specific ingredient, e.g. "🍗" for chicken, "🌿" for basil'),
   is_main: z.boolean().describe('True only for the single main/hero ingredient this suggestion centers on (usually the protein) — false for every supporting or side ingredient'),
+  is_staple: z.boolean().describe('True only for near-universal pantry basics almost every household already has (salt, black pepper, cooking oil, butter, sugar, flour) — false for everything else, including specific proteins, produce, and dairy'),
 })
 
 const SuggestionSchema = z.object({
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
     ? 'Suggestions may include up to 2 minor additional ingredients the household would need to pick up, but should mostly rely on what\'s already on hand.'
     : 'Every suggestion must use only ingredients already in the household\'s inventory — do not suggest anything requiring a store trip.'
 
-  const systemPrompt = `You help a household decide what to cook tonight using what they already have on hand. Suggest practical, low-effort meal ideas — not formal recipes with precise measurements, just a workable combination and brief guidance. ${shoppingRule} Give slight preference to combinations that use ingredients flagged as good to use up, but don't force it if a better combination exists without them. Never suggest anything containing one of the household's dietary restrictions — treat every one as a hard exclude. Favorite cuisines and macro goals are soft preferences — lean into them when a good option fits, but don't force it. For each suggestion, mark exactly one ingredient as the main/hero ingredient (usually the protein) and every other ingredient as a side.`
+  const systemPrompt = `You help a household decide what to cook tonight using what they already have on hand. Suggest practical, low-effort meal ideas — not formal recipes with precise measurements, just a workable combination and brief guidance. ${shoppingRule} Give slight preference to combinations that use ingredients flagged as good to use up, but don't force it if a better combination exists without them. Never suggest anything containing one of the household's dietary restrictions — treat every one as a hard exclude. Favorite cuisines and macro goals are soft preferences — lean into them when a good option fits, but don't force it. For each suggestion, mark exactly one ingredient as the main/hero ingredient (usually the protein) and every other ingredient as a side. Also mark each ingredient as a staple or not — staples are near-universal pantry basics (salt, pepper, cooking oil, butter, etc.), used only to keep suggestion cards focused on the ingredients that actually define the dish.`
 
   const inventoryLines = inventory.map(i => `${i.name} (${i.quantity} ${i.unit}, ${i.category})`).join('\n')
 

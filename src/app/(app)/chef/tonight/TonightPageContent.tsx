@@ -6,18 +6,19 @@ import ChefTabs from '@/components/chef/ChefTabs'
 import ChefAddMenu from '@/components/chef/ChefAddMenu'
 import ChefSwipeableBody from '@/components/chef/ChefSwipeableBody'
 import OnHandToggle from '@/components/chef/OnHandToggle'
-import type { InventoryItem } from '@/lib/chefData'
+import type { ChefPreferences, InventoryItem } from '@/lib/chefData'
 import TonightResults from './TonightResults'
 
 interface Props {
   inventory: InventoryItem[]
   priorityItems: string[]
   defaultServings: number
+  preferences: ChefPreferences
   householdId: string
   userId: string
 }
 
-export default function TonightPageContent({ inventory, priorityItems, defaultServings, householdId, userId }: Props) {
+export default function TonightPageContent({ inventory, priorityItems, defaultServings, preferences, householdId, userId }: Props) {
   const [strictOnly, setStrictOnly] = useState(true)
 
   return (
@@ -32,6 +33,7 @@ export default function TonightPageContent({ inventory, priorityItems, defaultSe
             inventory={inventory}
             priorityItems={priorityItems}
             defaultServings={defaultServings}
+            preferences={preferences}
             strictOnly={strictOnly}
             householdId={householdId}
             userId={userId}

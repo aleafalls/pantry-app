@@ -8,7 +8,7 @@ import ChefSwipeableBody from '@/components/chef/ChefSwipeableBody'
 import RecipeIdeasPreview from '@/components/chef/RecipeIdeasPreview'
 import SavedRecipesPreview from '@/components/chef/SavedRecipesPreview'
 import { getChefContext } from '@/lib/chefData'
-import { computeMatchPercent } from '@/lib/recipeMatch'
+import { computeMatchPercent, type MatchIngredient } from '@/lib/recipeMatch'
 import ChefSuggestions from './ChefSuggestions'
 
 export default async function ChefPage() {
@@ -37,13 +37,13 @@ export default async function ChefPage() {
 
   const recipeIds = (recentRecipes ?? []).map(r => r.id)
   const { data: previewIngredients } = recipeIds.length > 0
-    ? await supabase.from('recipe_ingredients').select('recipe_id, name').in('recipe_id', recipeIds)
+    ? await supabase.from('recipe_ingredients').select('recipe_id, name, canonical_name, is_staple').in('recipe_id', recipeIds)
     : { data: [] }
 
-  const previewIngredientsByRecipe = new Map<string, string[]>()
+  const previewIngredientsByRecipe = new Map<string, MatchIngredient[]>()
   for (const ing of previewIngredients ?? []) {
     const list = previewIngredientsByRecipe.get(ing.recipe_id) ?? []
-    list.push(ing.name)
+    list.push({ name: ing.name, canonicalName: ing.canonical_name, isStaple: ing.is_staple })
     previewIngredientsByRecipe.set(ing.recipe_id, list)
   }
 
@@ -67,6 +67,7 @@ export default async function ChefPage() {
             inventory={context.inventory}
             priorityItems={context.priorityItems}
             defaultServings={context.defaultServings}
+            preferences={context.preferences}
             householdId={profile.household_id}
             userId={user.id}
           />

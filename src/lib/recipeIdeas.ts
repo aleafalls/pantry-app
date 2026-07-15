@@ -1,4 +1,4 @@
-import type { InventoryItem } from './chefData'
+import type { ChefPreferences, InventoryItem } from './chefData'
 
 export interface RecipeIdeaIngredient {
   name: string
@@ -12,7 +12,7 @@ export interface RecipeIdea {
   emoji: string
   description: string
   servings: number
-  instructions: string
+  instructions: string[]
   ingredients: RecipeIdeaIngredient[]
 }
 
@@ -21,6 +21,7 @@ export interface RecipeIdeasParams {
   defaultServings: number
   query?: string
   anchorIngredient?: string
+  preferences?: ChefPreferences
 }
 
 export async function fetchRecipeIdeas(params: RecipeIdeasParams): Promise<RecipeIdea[] | null> {
@@ -33,6 +34,11 @@ export async function fetchRecipeIdeas(params: RecipeIdeasParams): Promise<Recip
         default_servings: params.defaultServings,
         query: params.query,
         anchor_ingredient: params.anchorIngredient,
+        household_preferences: params.preferences && {
+          dietary_restrictions: params.preferences.dietaryRestrictions,
+          favorite_cuisines: params.preferences.favoriteCuisines,
+          macro_goals: params.preferences.macroGoals,
+        },
       }),
     })
     if (!res.ok) return null

@@ -14,6 +14,7 @@ export interface EnrichmentResult {
   location: string | null
   emoji: string
   estimated_price: number
+  canonical_name: string
 }
 
 // Module-level so it survives Next.js client-side navigation (no full page

@@ -16,6 +16,8 @@ import QuantityStepper from '@/components/add/QuantityStepper'
 import TagInput from '@/components/add/TagInput'
 import IngredientRows, { type RecipeIngredientRow } from '@/components/chef/IngredientRows'
 import { COURSE_TYPES } from '@/lib/constants'
+import { takeRecipeImportDraft } from '@/lib/recipeImport'
+import { canonicalizeIngredients } from '@/lib/ingredientCanonicalize'
 
 const glassField = {
   background: 'oklch(100% 0 0 / 0.6)',
@@ -34,6 +36,8 @@ export default function NewRecipePage() {
   const [totalTimeMinutes, setTotalTimeMinutes] = useState<number | ''>('')
   const [ingredients, setIngredients] = useState<RecipeIngredientRow[]>([])
   const [instructions, setInstructions] = useState('')
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [sourceUrl, setSourceUrl] = useState<string | null>(null)
 
   const [loading, setLoading] = useState(false)
   const [householdId, setHouseholdId] = useState<string | null>(null)
@@ -51,6 +55,23 @@ export default function NewRecipePage() {
           if (profile?.household_id) setHouseholdId(profile.household_id)
         })
     })
+  }, [])
+
+  // Pre-fill from an in-progress web import, if the user just came from
+  // /chef/import — read-once, then the draft clears itself.
+  useEffect(() => {
+    const draft = takeRecipeImportDraft()
+    if (!draft) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: hydrate the form from a one-shot sessionStorage handoff after mount
+    setName(draft.name)
+    setCourseType(draft.courseType)
+    setTags(draft.tags)
+    setServings(draft.servings)
+    setTotalTimeMinutes(draft.totalTimeMinutes)
+    setIngredients(draft.ingredients)
+    setInstructions(draft.instructions)
+    setImageUrl(draft.imageUrl)
+    setSourceUrl(draft.sourceUrl)
   }, [])
 
   const isValid = name.trim() && ingredients.length > 0
@@ -72,7 +93,9 @@ export default function NewRecipePage() {
         emoji,
         course_type: courseType || null,
         tags,
-        source: 'manual',
+        source: sourceUrl ? 'web' : 'manual',
+        source_url: sourceUrl,
+        image_url: imageUrl,
         servings,
         total_time_minutes: totalTimeMinutes || null,
         instructions: instructions.trim() || null,
@@ -80,12 +103,17 @@ export default function NewRecipePage() {
       })
       if (recipeError) throw new Error(recipeError.message)
 
+      const canonicalized = await canonicalizeIngredients(ingredients.map(ing => ing.name))
+
       const { error: ingredientsError } = await supabase.from('recipe_ingredients').insert(
-        ingredients.map(ing => ({
+        ingredients.map((ing, i) => ({
           recipe_id: recipeId,
           name: ing.name,
           quantity: ing.quantity || null,
           unit: ing.unit || null,
+          canonical_name: canonicalized[i]?.canonicalName ?? null,
+          category: canonicalized[i]?.category ?? null,
+          is_staple: canonicalized[i]?.isStaple ?? false,
         }))
       )
       if (ingredientsError) throw new Error(ingredientsError.message)
@@ -133,6 +161,26 @@ export default function NewRecipePage() {
       <PageHeader title="New Recipe" backHref="/chef/saved" />
 
       <form onSubmit={handleSubmit} style={{ padding: '20px 20px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {imageUrl && (
+          <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', height: 160 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            <button
+              type="button"
+              onClick={() => setImageUrl(null)}
+              aria-label="Remove photo"
+              style={{
+                position: 'absolute', top: 8, right: 8,
+                width: 28, height: 28, borderRadius: '50%', border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'oklch(20% 0 0 / 0.55)', color: '#fff',
+              }}
+            >
+              <i className="fi-rr-cross-small" style={{ fontSize: 14, display: 'block' }} />
+            </button>
+          </div>
+        )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Input

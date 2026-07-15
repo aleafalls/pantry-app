@@ -35,12 +35,15 @@ export default function ChefAddMenu() {
           Manually Add Recipe
         </DropdownMenuItem>
         <DropdownMenuItem
-          disabled
-          className="text-sm flex flex-col items-start gap-0"
-          style={{ cursor: 'not-allowed' }}
+          onSelect={() => router.push('/chef/import')}
+          className="text-sm"
+          style={{ cursor: 'pointer' }}
+          onFocus={e => (e.currentTarget.style.background = 'oklch(96% 0.006 85)')}
+          onBlur={e => (e.currentTarget.style.background = 'transparent')}
+          onMouseEnter={e => (e.currentTarget.style.background = 'oklch(96% 0.006 85)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
         >
-          <span>Import Recipe from URL</span>
-          <span className="text-11" style={{ color: 'var(--muted)' }}>Coming soon</span>
+          Import Recipe from URL
         </DropdownMenuItem>
         <DropdownMenuItem
           disabled

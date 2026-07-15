@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { InventoryItem } from '@/lib/chefData'
+import type { ChefPreferences, InventoryItem } from '@/lib/chefData'
 import { fetchRecipeIdeas, getCachedRecipeIdeas, matchPercent, setCachedRecipeIdeas, type RecipeIdea } from '@/lib/recipeIdeas'
 import { getRandomPrompts } from '@/lib/recipePrompts'
 import AiLoadingCard from '@/components/chef/AiLoadingCard'
@@ -12,6 +12,7 @@ import RecipeIdeaDetailSheet from '@/components/chef/RecipeIdeaDetailSheet'
 interface Props {
   inventory: InventoryItem[]
   defaultServings: number
+  preferences: ChefPreferences
   query?: string
   householdId: string
   userId: string
@@ -25,7 +26,7 @@ const glassCard: React.CSSProperties = {
   boxShadow: 'oklch(1 0 0 / 0.7) 0px 0px 0px inset, oklch(0.3 0.02 85 / 0.25) 0px 4px 14px -8px',
 }
 
-export default function IdeasResults({ inventory, defaultServings, query, householdId, userId }: Props) {
+export default function IdeasResults({ inventory, defaultServings, preferences, query, householdId, userId }: Props) {
   const router = useRouter()
   const [inputValue, setInputValue] = useState(query ?? '')
   const [starterPrompts, setStarterPrompts] = useState<string[]>([])
@@ -35,6 +36,11 @@ export default function IdeasResults({ inventory, defaultServings, query, househ
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(false)
   const [selectedIdea, setSelectedIdea] = useState<RecipeIdea | null>(null)
+  // Guards the mount effect below against React's dev-mode double-invoke
+  // (Strict Mode fires effects twice) — without this, the initial search
+  // fires two requests, and whichever resolves last (success or error)
+  // silently overwrites the other's state.
+  const didLoadRef = useRef(false)
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: randomize client-side only to avoid a server/client hydration mismatch
@@ -45,7 +51,7 @@ export default function IdeasResults({ inventory, defaultServings, query, househ
     setLoading(true)
     setError(false)
     setSuggestions(null)
-    fetchRecipeIdeas({ inventory, defaultServings, query: q })
+    fetchRecipeIdeas({ inventory, defaultServings, query: q, preferences })
       .then(data => {
         if (data) {
           setSuggestions(data)
@@ -57,6 +63,9 @@ export default function IdeasResults({ inventory, defaultServings, query, househ
   }
 
   useEffect(() => {
+    if (didLoadRef.current) return
+    didLoadRef.current = true
+
     if (query) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: (re)fetch whenever the query changes
       if (inventory.length > 0) load(query)
@@ -81,7 +90,7 @@ export default function IdeasResults({ inventory, defaultServings, query, househ
   function handleGetMore() {
     if (!activeQuery) return
     setLoadingMore(true)
-    fetchRecipeIdeas({ inventory, defaultServings, query: activeQuery })
+    fetchRecipeIdeas({ inventory, defaultServings, query: activeQuery, preferences })
       .then(data => {
         if (data) {
           setSuggestions(prev => {

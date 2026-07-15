@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import AppBackground from '@/components/layout/AppBackground'
 import SavedRecipesGrid, { type SavedRecipeListItem } from '@/components/chef/SavedRecipesGrid'
 import { getChefContext } from '@/lib/chefData'
-import { computeMatchPercent } from '@/lib/recipeMatch'
+import { computeMatchPercent, type MatchIngredient } from '@/lib/recipeMatch'
 
 export default async function ChefSavedPage() {
   const supabase = await createClient()
@@ -30,13 +30,13 @@ export default async function ChefSavedPage() {
 
   const recipeIds = (recipes ?? []).map(r => r.id)
   const { data: allIngredients } = recipeIds.length > 0
-    ? await supabase.from('recipe_ingredients').select('recipe_id, name').in('recipe_id', recipeIds)
+    ? await supabase.from('recipe_ingredients').select('recipe_id, name, canonical_name, is_staple').in('recipe_id', recipeIds)
     : { data: [] }
 
-  const ingredientsByRecipe = new Map<string, string[]>()
+  const ingredientsByRecipe = new Map<string, MatchIngredient[]>()
   for (const ing of allIngredients ?? []) {
     const list = ingredientsByRecipe.get(ing.recipe_id) ?? []
-    list.push(ing.name)
+    list.push({ name: ing.name, canonicalName: ing.canonical_name, isStaple: ing.is_staple })
     ingredientsByRecipe.set(ing.recipe_id, list)
   }
 

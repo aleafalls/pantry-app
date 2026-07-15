@@ -3,20 +3,31 @@ import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { CATEGORIES, UNITS_GROUPED, LOCATIONS } from '@/lib/constants'
+import { CANONICAL_NAME_DESCRIPTION } from '@/lib/canonicalIngredient'
 
 const UNITS = Object.values(UNITS_GROUPED).flat()
 const LOCATION_VALUES = LOCATIONS.map(l => l.value)
 
+// category/unit/location are plain strings, not z.enum — an enum mismatch
+// throws and discards the entire parsed response (price, emoji, and
+// canonical_name included), so an unmapped suggestion for just one of
+// these fields shouldn't be able to sink the other two. Valid values are
+// enforced afterward with coerceEnum instead.
 const EnrichmentSchema = z.object({
-  category: z.enum(CATEGORIES as [string, ...string[]]).nullable()
+  category: z.string().nullable()
     .describe('Only set if confident based on the item name; null otherwise'),
-  unit: z.enum(UNITS as [string, ...string[]]).nullable()
+  unit: z.string().nullable()
     .describe('The most precise unit for how this item is typically sold/measured; null if the current unit is already correct or not confident'),
-  location: z.enum(LOCATION_VALUES as [string, ...string[]]).nullable()
+  location: z.string().nullable()
     .describe('Where this item is most likely stored in the home; null if the current location is already correct or not confident'),
   emoji: z.string().describe('A single emoji that best represents this item — prefer food/product emojis over generic symbols'),
   estimated_price: z.number().describe('Estimated price in USD per one unit of the chosen/given unit'),
+  canonical_name: z.string().describe(`${CANONICAL_NAME_DESCRIPTION} Used to match this item against recipe ingredients written differently.`),
 })
+
+function coerceEnum(value: string | null, validValues: string[]): string | null {
+  return value && validValues.includes(value) ? value : null
+}
 
 const SHOPPING_TIER_DESCRIPTIONS: Record<number, string> = {
   1: 'shops primarily at discount/value grocery stores (e.g., Walmart, Aldi) and prefers store-brand products',
@@ -45,7 +56,7 @@ export async function POST(request: Request) {
 
   const region = city && state ? `${city}, ${state}` : (city || state || 'unknown — use typical US grocery pricing')
 
-  const systemPrompt = `You help a household pantry app enrich a new grocery item with details it doesn't have yet: category, unit, storage location, emoji, and estimated price. Only suggest a category, unit, or storage location if you're reasonably confident based on the item name — leave it null rather than guess. Emoji and price should always be provided.`
+  const systemPrompt = `You help a household pantry app enrich a new grocery item with details it doesn't have yet: category, unit, storage location, emoji, estimated price, and a canonical name. Only suggest a category, unit, or storage location if you're reasonably confident based on the item name — leave it null rather than guess. Emoji, price, and canonical name should always be provided.`
 
   const userPrompt = `Item: ${name}
 Category: ${category || '(not yet set)'}
@@ -72,11 +83,19 @@ Valid storage locations: ${LOCATION_VALUES.join(', ')}`
     })
 
     if (!response.parsed_output) {
+      console.error(`enrich-item: no parsed_output for "${name}"`)
       return NextResponse.json({ error: 'enrichment failed' }, { status: 502 })
     }
 
-    return NextResponse.json(response.parsed_output)
-  } catch {
+    const parsed = response.parsed_output
+    return NextResponse.json({
+      ...parsed,
+      category: coerceEnum(parsed.category, CATEGORIES),
+      unit: coerceEnum(parsed.unit, UNITS),
+      location: coerceEnum(parsed.location, LOCATION_VALUES),
+    })
+  } catch (err) {
+    console.error(`enrich-item: request failed for "${name}"`, err)
     return NextResponse.json({ error: 'enrichment failed' }, { status: 502 })
   }
 }

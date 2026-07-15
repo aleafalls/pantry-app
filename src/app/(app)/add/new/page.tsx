@@ -53,6 +53,7 @@ function NewItemForm() {
     return raw ? raw.split(',').filter(Boolean) : []
   })
   const [estimatedPrice, setEstimatedPrice] = useState<number | null>(null)
+  const [canonicalName, setCanonicalName] = useState<string | null>(null)
 
   // ── AI enrichment ─────────────────────────────────────────
   const [enriching, setEnriching] = useState(false)
@@ -73,6 +74,7 @@ function NewItemForm() {
     if (result.location) setLocation(prev => prev === 'pantry' ? result.location! : prev)
     if (result.emoji) setEmoji(prev => prev === '📦' ? result.emoji : prev)
     setEstimatedPrice(result.estimated_price)
+    setCanonicalName(result.canonical_name)
   }
 
   useEffect(() => {
@@ -94,13 +96,16 @@ function NewItemForm() {
           setHouseholdState(household?.state ?? null)
           setShoppingTier(household?.shopping_tier ?? null)
 
-          // Arrived with a name already resolved (barcode scan, or typed +
-          // tapped "Create" on the Add page) — enrich automatically. Picks
-          // up the prewarmed request from the shared cache if one exists.
-          // Skipped for catalog items — those already arrive with known
-          // category/unit/location/emoji, no guessing needed.
+          // Arrived with a name already resolved (barcode scan, typed +
+          // tapped "Create," or a catalog match) — enrich automatically.
+          // Picks up the prewarmed request from the shared cache if one
+          // exists. Catalog items already arrive with known
+          // category/unit/location/emoji via query params, and
+          // applyEnrichment only fills those in when still at their default
+          // value — so this still contributes canonical_name (and price)
+          // for catalog items without overwriting what the catalog set.
           const initialName = searchParams.get('name')
-          if (initialName?.trim() && !catalogId) {
+          if (initialName?.trim()) {
             setEnriching(true)
             getOrFetchEnrichment({
               name: initialName,
@@ -168,6 +173,7 @@ function NewItemForm() {
         auto_shopping_list: autoShoppingList,
         barcode: barcode || null,
         estimated_price: estimatedPrice,
+        canonical_name: canonicalName,
         catalog_id: catalogId || null,
         active: true,
       })

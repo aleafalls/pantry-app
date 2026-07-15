@@ -40,6 +40,7 @@ export default async function ChefIdeasPage({ searchParams }: Props) {
             key={q ?? 'none'}
             inventory={context.inventory}
             defaultServings={context.defaultServings}
+            preferences={context.preferences}
             query={q}
             householdId={profile.household_id}
             userId={user.id}

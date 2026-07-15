@@ -14,6 +14,9 @@ export interface RecipeIngredientData {
   name: string
   quantity: string | null
   unit: string | null
+  canonical_name: string | null
+  category: string | null
+  is_staple: boolean
 }
 
 export interface RecipeData {
@@ -25,6 +28,8 @@ export interface RecipeData {
   servings: number | null
   total_time_minutes: number | null
   instructions: string | null
+  source_url: string | null
+  image_url: string | null
 }
 
 interface Props {
@@ -93,6 +98,7 @@ export default function RecipeTabs({ recipe, ingredients, inventory, householdId
           <EditView
             recipe={recipe}
             ingredients={ingredients}
+            householdId={householdId}
             onSaved={() => setTab('cook')}
           />
         )}
