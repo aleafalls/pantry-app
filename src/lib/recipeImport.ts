@@ -14,6 +14,7 @@ export interface RecipeImportDraft {
   instructions: string
   imageUrl: string | null
   sourceUrl: string
+  source: 'web' | 'photo'
 }
 
 const STORAGE_KEY = 'chef-recipe-import-draft'
@@ -38,10 +39,37 @@ export async function fetchRecipeImport(url: string): Promise<{ data?: RecipeImp
         instructions: body.instructions ?? '',
         imageUrl: body.imageUrl ?? null,
         sourceUrl: url,
+        source: 'web',
       },
     }
   } catch {
     return { error: "Couldn't import that recipe." }
+  }
+}
+
+export async function fetchRecipePhotoImport(file: File): Promise<{ data?: RecipeImportDraft; error?: string }> {
+  try {
+    const formData = new FormData()
+    formData.append('photo', file)
+    const res = await fetch('/api/recipes/import-photo', { method: 'POST', body: formData })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) return { error: body.error ?? "Couldn't read that photo." }
+    return {
+      data: {
+        name: body.name ?? '',
+        courseType: body.courseType ?? '',
+        tags: body.tags ?? [],
+        servings: body.servings ?? 4,
+        totalTimeMinutes: body.totalTimeMinutes ?? '',
+        ingredients: body.ingredients ?? [],
+        instructions: body.instructions ?? '',
+        imageUrl: body.imageUrl ?? null,
+        sourceUrl: '',
+        source: 'photo',
+      },
+    }
+  } catch {
+    return { error: "Couldn't read that photo." }
   }
 }
 

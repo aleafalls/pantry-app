@@ -42,6 +42,8 @@ This document is the step-by-step guide for building the pantry app from zero to
 15. [Phase 14 — Chef: Recipes & AI Suggestions *(Phase 3)*](#phase-14--chef-recipes--ai-suggestions-phase-3)
 16. [Phase 15 — Chef: Web Recipe Import *(Phase 3)*](#phase-15--chef-web-recipe-import-phase-3)
 17. [Phase 16 — Chef: Photo Recipe Import *(Phase 3)*](#phase-16--chef-photo-recipe-import-phase-3)
+18. [Phase 17 — Receipt Scanning *(Future)*](#phase-17--receipt-scanning-future)
+19. [Phase 18 — Batch Inventory from a Cabinet Photo *(Future)*](#phase-18--batch-inventory-from-a-cabinet-photo-future)
 
 ---
 
@@ -1074,7 +1076,7 @@ The Suggestions tab splits into two sections rather than a single suggestion lis
 ### 16.1 — Supabase Storage Bucket for Recipe Photos
 
 1. 🧑‍💻 In Supabase, create a `recipe-photos` storage bucket.
-2. 🤖 **Claude provides:** Storage RLS policies scoped by household, matching the pattern used for the rest of the app's data.
+2. ✅ **Built:** `supabase/recipe-photos-storage.sql` — RLS policies scoped by household, same `get_my_household_id()` isolation pattern used everywhere else. Bucket is private; photos upload to `{household_id}/{filename}`.
 
 ✅ **Verify:** The bucket appears in Storage with policies applied.
 
@@ -1082,13 +1084,14 @@ The Suggestions tab splits into two sections rather than a single suggestion lis
 
 ### 16.2 — Photo Capture/Upload UI
 
-1. 🤖 **Claude writes:** Add an "or import from a photo" option to `chef/import/page.tsx` — opens the camera or a photo picker, similar in spirit to `BarcodeScanner` from Phase 12 but capturing a single still image instead of continuously scanning.
+1. ✅ **Built:** `src/app/(app)/chef/import/page.tsx` — an "or" divider below the URL form, then a dashed-border tile ("Take or upload a photo") wrapping a plain `<input type="file" accept="image/*" capture="environment">`. Simpler than `BarcodeScanner`: no live video stream, just the native camera/photo picker for one still image.
 
 ---
 
 ### 16.3 — Claude Vision Extraction Route
 
-1. 🤖 **Claude writes:** `src/app/api/recipes/import-photo/route.ts` — sends the photo to Claude with instructions to extract the same structured recipe fields as 15.3.
+1. ✅ **Built:** `src/app/api/recipes/import-photo/route.ts` — verifies the user's household server-side (never trusts a client-supplied one), sends the photo to `claude-haiku-4-5` with the same structured-output schema as the web importer's fallback path (15.3), and separately fires a best-effort archival upload to the `recipe-photos` bucket (a storage hiccup doesn't block the import — extraction runs off the in-memory bytes either way). Caps uploads at 3.5MB and rejects non-JPEG/PNG/WEBP/GIF types before ever calling Claude.
+2. Returns `imageUrl: null` rather than pointing the recipe at the raw uploaded photo — a document scan isn't a good recipe hero image, so it falls back to the emoji tile from the Phase 14.0 addendum instead.
 
 > ⚠️ Photo payloads are larger than a page-text extraction and cost more per call — this is the most expensive of the three capture paths. Worth confirming actual per-call cost once this is live.
 
@@ -1096,9 +1099,31 @@ The Suggestions tab splits into two sections rather than a single suggestion lis
 
 ### 16.4 — Pre-fill & Confirm Screen
 
-1. 🤖 **Claude writes:** Reuses the confirm/edit screen from 15.4 — same review-before-save principle applies, especially for handwriting, which is the least reliable input for this flow.
+1. ✅ **Built:** Reuses `/chef/new` — same screen and same review-before-save principle as the web import (15.4). Required adding an explicit `source: 'web' | 'photo'` field to the shared `RecipeImportDraft` (`src/lib/recipeImport.ts`) so photo imports are tagged `recipes.source = 'photo'` instead of being miscategorized as `'manual'`, which is how it worked before this phase (source was inferred from the presence of a URL).
 
-✅ **Verify:** Take a photo of a printed recipe — fields pre-fill reasonably. Take a photo of a handwritten recipe card — check quality; if handwriting recognition is unreliable, that's worth flagging as a known limitation rather than something to keep tuning.
+✅ **Verified:** End-to-end with a synthetic recipe image — extraction correctly produced name, course type, servings, time, tags, and ingredients, landing pre-filled on `/chef/new`. Real-photo testing (printed page vs. handwritten card) still needs a pass on an actual device — that's the one check that can't be done synthetically; handwriting accuracy in particular is a known open question per the note above.
+
+---
+
+## Phase 17 — Receipt Scanning *(Future)*
+
+**Goal:** Photograph a grocery receipt to restock items in bulk instead of one at a time. Same shape as Phase 16 (photo in → Claude vision extraction → confirm screen), different domain: line items with quantity/price rather than recipe ingredients/instructions.
+
+> Not yet scoped in detail. Notes from the Phase 16 discussion:
+> - Separate `receipt-photos` storage bucket, not shared with `recipe-photos` — different retention needs (a receipt likely shouldn't be kept indefinitely; a recipe photo probably should).
+> - Extraction is closer to OCR/line-item parsing than Phase 16's free-text recipe extraction — likely higher accuracy out of the gate than the cabinet-photo case below, since receipts are printed and structured.
+> - Needs matching logic against existing `items`/`catalog` (by name) before writing to `inventory`, plus a review-before-save step — same principle as every other AI extraction path in this app, more important here since it writes real stock changes.
+
+---
+
+## Phase 18 — Batch Inventory from a Cabinet Photo *(Future)*
+
+**Goal:** Photograph a shelf or spice cabinet and add multiple items to inventory in one pass, instead of adding them one at a time through the normal Add flow.
+
+> Not yet scoped in detail. Notes from the Phase 16 discussion:
+> - Harder than Phases 16–17: this is object recognition across a cluttered image (identifying several distinct physical items), not text extraction from one document. Accuracy — especially on small spice-jar labels — needs real testing before trusting it to bulk-write inventory.
+> - Separate storage bucket from recipe/receipt photos, same reasoning as Phase 17.
+> - Confirm screen is even more load-bearing here — likely needs per-item accept/reject/edit, not just one bulk "looks right" confirmation, since misreads are more likely than in the receipt case.
 
 ---
 

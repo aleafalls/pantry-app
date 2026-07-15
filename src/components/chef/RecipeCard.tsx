@@ -97,20 +97,29 @@ export default function RecipeCard({ id, name, emoji, imageUrl, source, matchPer
   )
 }
 
-export function AddRecipeCard() {
+function AddOptionButton({ href, icon, label }: { href: string; icon: string; label: string }) {
   return (
     <Link
-      href="/chef/new"
-      className="flex flex-col items-center justify-center gap-1 rounded-14"
+      href={href}
       style={{
-        aspectRatio: '1 / 1',
-        textDecoration: 'none',
-        ...glassCard,
-        border: '1.5px dashed var(--divider)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        gap: 4, flex: 1, padding: 8, textDecoration: 'none',
+        borderRadius: 14, ...glassCard, border: '1.5px dashed var(--divider)',
       }}
     >
-      <i className="fi-rr-plus" style={{ fontSize: 20, color: 'var(--muted)' }} />
-      <span className="text-13 font-bold" style={{ color: 'var(--muted)' }}>Add recipe</span>
+      <i className={icon} style={{ fontSize: 16, display: 'block', color: 'var(--muted)' }} />
+      <span className="text-11 font-bold" style={{ color: 'var(--muted)', lineHeight: 1.2, textAlign: 'center' }}>
+        {label}
+      </span>
     </Link>
+  )
+}
+
+export function AddRecipeCard() {
+  return (
+    <div className="flex flex-col gap-2" style={{ aspectRatio: '1 / 1' }}>
+      <AddOptionButton href="/chef/new" icon="fi-rr-edit" label="Manually Add Recipe" />
+      <AddOptionButton href="/chef/import" icon="fi-rr-download" label="Import Recipe" />
+    </div>
   )
 }

@@ -6,7 +6,7 @@ import PageHeader from '@/components/layout/PageHeader'
 import AppBackground from '@/components/layout/AppBackground'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { fetchRecipeImport, setRecipeImportDraft } from '@/lib/recipeImport'
+import { fetchRecipeImport, fetchRecipePhotoImport, setRecipeImportDraft } from '@/lib/recipeImport'
 
 export default function ImportRecipePage() {
   const router = useRouter()
@@ -19,6 +19,10 @@ export default function ImportRecipePage() {
   // is set synchronously, so the second submit bails out immediately instead
   // of sending a duplicate import request.
   const submittingRef = useRef(false)
+
+  const [photoLoading, setPhotoLoading] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
 
   async function handleImport(e: React.FormEvent) {
     e.preventDefault()
@@ -35,6 +39,26 @@ export default function ImportRecipePage() {
 
     if (result.error || !result.data) {
       setError(result.error ?? "Couldn't import that recipe.")
+      return
+    }
+    setRecipeImportDraft(result.data)
+    router.push('/chef/new')
+  }
+
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file after an error
+    if (!file || submittingRef.current) return
+    submittingRef.current = true
+    setPhotoLoading(true)
+    setPhotoError(null)
+
+    const result = await fetchRecipePhotoImport(file)
+    submittingRef.current = false
+    setPhotoLoading(false)
+
+    if (result.error || !result.data) {
+      setPhotoError(result.error ?? "Couldn't read that photo.")
       return
     }
     setRecipeImportDraft(result.data)
@@ -82,6 +106,51 @@ export default function ImportRecipePage() {
           {loading ? 'Importing…' : 'Import Recipe'}
         </Button>
       </form>
+
+      <div style={{ padding: '20px 20px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1, height: 1, background: 'var(--divider)' }} />
+          <span className="text-13" style={{ color: 'var(--muted)' }}>or</span>
+          <div style={{ flex: 1, height: 1, background: 'var(--divider)' }} />
+        </div>
+
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handlePhotoChange}
+          style={{ display: 'none' }}
+        />
+
+        <button
+          type="button"
+          onClick={() => photoInputRef.current?.click()}
+          disabled={photoLoading}
+          style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            gap: 8, padding: '28px 16px', width: '100%',
+            background: 'oklch(100% 0 0 / 0.4)',
+            border: '1.5px dashed oklch(60% 0.02 85 / 0.4)',
+            borderRadius: 16, cursor: photoLoading ? 'default' : 'pointer',
+          }}
+        >
+          <i
+            className={photoLoading ? 'fi-rr-rotate-right' : 'fi-rr-camera'}
+            style={{ fontSize: 22, display: 'block', color: 'var(--amber)', animation: photoLoading ? 'spin 1s linear infinite' : 'none' }}
+          />
+          <span className="text-13" style={{ color: 'var(--foreground)', fontWeight: 600 }}>
+            {photoLoading ? 'Reading your recipe…' : 'Take or upload a photo'}
+          </span>
+          <span className="text-11" style={{ color: 'var(--muted)' }}>
+            A cookbook page, recipe card, or printout
+          </span>
+        </button>
+
+        {photoError && (
+          <p className="text-sm" style={{ color: 'var(--red)', margin: 0 }}>{photoError}</p>
+        )}
+      </div>
     </AppBackground>
   )
 }
