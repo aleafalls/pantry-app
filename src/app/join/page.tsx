@@ -69,16 +69,14 @@ function JoinForm() {
     setError('')
     const supabase = createClient()
     const { data, error } = await supabase
-      .from('households')
-      .select('id, name')
-      .eq('invite_code', code.trim().toUpperCase())
+      .rpc('get_household_by_invite_code', { p_invite_code: code.trim().toUpperCase() })
       .single()
     if (error || !data) {
       setError("That code doesn't match any household. Double-check it and try again.")
       setLoading(false)
       return
     }
-    setHousehold(data)
+    setHousehold(data as { id: string; name: string })
     setStep('name')
     setLoading(false)
   }
