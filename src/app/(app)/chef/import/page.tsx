@@ -118,7 +118,6 @@ export default function ImportRecipePage() {
           ref={photoInputRef}
           type="file"
           accept="image/*"
-          capture="environment"
           onChange={handlePhotoChange}
           style={{ display: 'none' }}
         />
