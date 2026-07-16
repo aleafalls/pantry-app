@@ -17,6 +17,7 @@ import TagInput from '@/components/add/TagInput'
 import { CATEGORIES, UNITS_GROUPED, LOCATIONS } from '@/lib/constants'
 import { getOrFetchEnrichment, refetchEnrichment, type EnrichmentResult } from '@/lib/enrichment'
 import { fetchItemTagSuggestions } from '@/lib/tagSuggestions'
+import { canonicalizeIngredients } from '@/lib/ingredientCanonicalize'
 
 function NewItemForm() {
   const router = useRouter()
@@ -163,6 +164,19 @@ function NewItemForm() {
     const trimmedName = name.trim()
 
     const savePromise = (async () => {
+      // Enrichment (barcode/catalog/typed-then-create auto-trigger, or a
+      // manual Autofill tap) usually already resolved this — but a freely
+      // typed name that never went through either path would otherwise
+      // save with no canonical_name, breaking recipe-ingredient matching
+      // against this item indefinitely. Fill it in narrowly here (just the
+      // canonical name, not category/unit/emoji/price) rather than running
+      // full enrichment, which could silently override user-chosen fields.
+      let resolvedCanonicalName = canonicalName
+      if (!resolvedCanonicalName) {
+        const [canonicalized] = await canonicalizeIngredients([trimmedName])
+        resolvedCanonicalName = canonicalized?.canonicalName ?? null
+      }
+
       const { error: itemError } = await supabase.from('items').insert({
         id: itemId,
         household_id: householdId,
@@ -176,7 +190,7 @@ function NewItemForm() {
         auto_shopping_list: autoShoppingList,
         barcode: barcode || null,
         estimated_price: estimatedPrice,
-        canonical_name: canonicalName,
+        canonical_name: resolvedCanonicalName,
         catalog_id: catalogId || null,
         active: true,
       })

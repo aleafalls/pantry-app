@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import type { InventoryItem } from '@/lib/chefData'
 import { parseLeadingQuantity } from '@/lib/quantity'
+import { ingredientIdentitySet, inventoryIdentityStrings } from '@/lib/recipeMatch'
 import CompactStepper from './CompactStepper'
 
 export interface PlannerIngredient {
@@ -28,15 +29,41 @@ interface IngredientMatch {
   itemId: string
 }
 
-function matchIngredient(ing: PlannerIngredient, inventory: InventoryItem[]): IngredientMatch | null {
-  const norm = ing.name.trim().toLowerCase()
-  const canonicalNorm = ing.canonical_name?.trim().toLowerCase()
-  const rows = inventory.filter(inv => {
-    if (canonicalNorm && inv.canonicalName) {
-      return inv.canonicalName.trim().toLowerCase() === canonicalNorm
+// A recipe can legitimately call for the same ingredient more than once
+// (e.g. olive oil for sautéing and again for a dressing). Every piece of
+// state below (matches, quantities, key props) is keyed by ing.name, so
+// duplicate names must be merged into one row before anything else touches
+// them — otherwise two entries silently share one stepper's state instead
+// of each tracking its own quantity.
+function mergeDuplicateIngredients(ingredients: PlannerIngredient[]): PlannerIngredient[] {
+  const order: string[] = []
+  const merged = new Map<string, { ing: PlannerIngredient; parts: string[] }>()
+
+  for (const ing of ingredients) {
+    const key = ing.name.trim().toLowerCase()
+    const part = [ing.quantity, ing.unit].filter(Boolean).join(' ').trim()
+    const existing = merged.get(key)
+    if (existing) {
+      if (part) existing.parts.push(part)
+    } else {
+      order.push(key)
+      merged.set(key, { ing, parts: part ? [part] : [] })
     }
-    return inv.name.trim().toLowerCase() === norm
+  }
+
+  return order.map(key => {
+    const { ing, parts } = merged.get(key)!
+    return { ...ing, quantity: parts.length > 0 ? parts.join(' + ') : null, unit: null }
   })
+}
+
+// Identity-set matching (canonical/raw names, "X or Y" alternatives, the
+// derived-form allowlist) lives in recipeMatch.ts and is shared with the
+// card-level match-percent calculation — the two used to be separate,
+// independently-maintained copies that silently drifted out of sync.
+function matchIngredient(ing: PlannerIngredient, inventory: InventoryItem[]): IngredientMatch | null {
+  const ingIds = ingredientIdentitySet(ing.name, ing.canonical_name)
+  const rows = inventory.filter(inv => inventoryIdentityStrings(inv).some(id => ingIds.has(id)))
   if (rows.length === 0) return null
   const total = rows.reduce((sum, r) => sum + r.quantity, 0)
   const primary = rows.reduce((a, b) => (b.quantity >= a.quantity ? b : a))
@@ -70,7 +97,10 @@ function distributeStockUpdate(rows: InventoryItem[], newTotal: number): Array<{
   return updates
 }
 
-export default function IngredientStockPlanner({ ingredients, inventory, householdId, userId }: Props) {
+export default function IngredientStockPlanner({ ingredients: rawIngredients, inventory, householdId, userId }: Props) {
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- ingredients is stable per page load
+  const ingredients = useMemo(() => mergeDuplicateIngredients(rawIngredients), [])
+
   const matches = useMemo(() => {
     const map = new Map<string, IngredientMatch | null>()
     for (const ing of ingredients) map.set(ing.name, matchIngredient(ing, inventory))

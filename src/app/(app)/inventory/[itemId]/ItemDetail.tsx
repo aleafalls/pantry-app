@@ -15,6 +15,7 @@ import QuantityStepper from '@/components/add/QuantityStepper'
 import TagInput from '@/components/add/TagInput'
 import { LOCATIONS, UNITS_GROUPED, CATEGORIES } from '@/lib/constants'
 import { fetchItemTagSuggestions } from '@/lib/tagSuggestions'
+import { canonicalizeIngredients } from '@/lib/ingredientCanonicalize'
 
 interface InventoryRow {
   id: string
@@ -99,7 +100,14 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
     const trimmed = nameValue.trim()
     if (!trimmed || trimmed === item.name) return
     const supabase = createClient()
-    await supabase.from('items').update({ name: trimmed }).eq('id', item.id)
+    // canonical_name is derived from the name — a rename without
+    // recomputing it would leave a stale value that no longer matches this
+    // item, silently breaking recipe-ingredient matching against it.
+    const [canonicalized] = await canonicalizeIngredients([trimmed])
+    await supabase.from('items').update({
+      name: trimmed,
+      canonical_name: canonicalized?.canonicalName ?? null,
+    }).eq('id', item.id)
   }
 
   async function saveEmoji(emoji: string) {

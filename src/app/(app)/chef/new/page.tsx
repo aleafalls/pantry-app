@@ -83,6 +83,30 @@ export default function NewRecipePage() {
 
   const isValid = name.trim() && ingredients.length > 0
 
+  // Splits lines like "Salt & pepper" into separate ingredients so each can
+  // canonicalize and match inventory independently — a compound line can
+  // never resolve to a single matchable ingredient. Deliberately scoped to
+  // "&" only (not "and", which is too common inside legitimate single-item
+  // names — "mac and cheese", "peanut butter and jelly" — to split safely)
+  // and only when there's no quantity/unit to misattribute across the
+  // split parts. A shared-quantity compound ("1/2 cup mixed fresh herbs
+  // (parsley, cilantro, dill, mint)") is left as one line — dividing or
+  // duplicating that quantity across items would be a guess, not a fix.
+  function splitCompoundIngredients(rows: RecipeIngredientRow[]): RecipeIngredientRow[] {
+    const result: RecipeIngredientRow[] = []
+    for (const ing of rows) {
+      if (!ing.quantity.trim() && !ing.unit.trim() && ing.name.includes('&')) {
+        const parts = ing.name.split('&').map(p => p.trim()).filter(Boolean)
+        if (parts.length === 2) {
+          result.push(...parts.map(name => ({ name, quantity: '', unit: '' })))
+          continue
+        }
+      }
+      result.push(ing)
+    }
+    return result
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!isValid || !householdId || !userId) return
@@ -110,10 +134,11 @@ export default function NewRecipePage() {
       })
       if (recipeError) throw new Error(recipeError.message)
 
-      const canonicalized = await canonicalizeIngredients(ingredients.map(ing => ing.name))
+      const splitIngredients = splitCompoundIngredients(ingredients)
+      const canonicalized = await canonicalizeIngredients(splitIngredients.map(ing => ing.name))
 
       const { error: ingredientsError } = await supabase.from('recipe_ingredients').insert(
-        ingredients.map((ing, i) => ({
+        splitIngredients.map((ing, i) => ({
           recipe_id: recipeId,
           name: ing.name,
           quantity: ing.quantity || null,
