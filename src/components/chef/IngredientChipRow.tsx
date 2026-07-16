@@ -1,10 +1,10 @@
 import { getIngredientChipColors } from '@/lib/chipColors'
-import type { SuggestionIngredient } from '@/lib/chefSuggestions'
+import type { MealIdeaIngredient } from '@/lib/mealIdeas'
 
 const MAX_VISIBLE = 5
 
 interface Props {
-  ingredients: SuggestionIngredient[]
+  ingredients: MealIdeaIngredient[]
   /** 'used' colors each chip via getIngredientChipColors; 'needed' uses a flat neutral style. */
   variant?: 'used' | 'needed'
 }

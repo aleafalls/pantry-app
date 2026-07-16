@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
@@ -15,6 +15,7 @@ import TagInput from '@/components/add/TagInput'
 import IngredientRows, { type RecipeIngredientRow } from '@/components/chef/IngredientRows'
 import { COURSE_TYPES } from '@/lib/constants'
 import { canonicalizeIngredients } from '@/lib/ingredientCanonicalize'
+import { fetchRecipeTagSuggestions } from '@/lib/tagSuggestions'
 import type { RecipeData, RecipeIngredientData } from './RecipeTabs'
 
 const glassField = {
@@ -48,6 +49,11 @@ export default function EditView({ recipe, ingredients: initialIngredients, hous
   const [saving, setSaving] = useState(false)
   const [removing, setRemoving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
+
+  useEffect(() => {
+    fetchRecipeTagSuggestions(householdId).then(setTagSuggestions)
+  }, [householdId])
 
   const isValid = name.trim() && ingredients.length > 0
 
@@ -209,7 +215,7 @@ export default function EditView({ recipe, ingredients: initialIngredients, hous
         <Label style={{ display: 'block', marginBottom: 8 }}>
           Tags <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span>
         </Label>
-        <TagInput tags={tags} onChange={setTags} />
+        <TagInput tags={tags} onChange={setTags} suggestions={tagSuggestions} />
       </div>
 
       {sectionLabel('Ingredients')}

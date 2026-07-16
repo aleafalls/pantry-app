@@ -17,7 +17,9 @@ import TagInput from '@/components/add/TagInput'
 import IngredientRows, { type RecipeIngredientRow } from '@/components/chef/IngredientRows'
 import { COURSE_TYPES } from '@/lib/constants'
 import { takeRecipeImportDraft } from '@/lib/recipeImport'
+import RecipeSourceLink from '@/components/chef/RecipeSourceLink'
 import { canonicalizeIngredients } from '@/lib/ingredientCanonicalize'
+import { fetchRecipeTagSuggestions } from '@/lib/tagSuggestions'
 
 const glassField = {
   background: 'oklch(100% 0 0 / 0.6)',
@@ -43,6 +45,7 @@ export default function NewRecipePage() {
   const [loading, setLoading] = useState(false)
   const [householdId, setHouseholdId] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
 
   useEffect(() => {
     const supabase = createClient()
@@ -53,7 +56,9 @@ export default function NewRecipePage() {
         .select('household_id')
         .eq('id', user.id).single()
         .then(({ data: profile }) => {
-          if (profile?.household_id) setHouseholdId(profile.household_id)
+          if (!profile?.household_id) return
+          setHouseholdId(profile.household_id)
+          fetchRecipeTagSuggestions(profile.household_id).then(setTagSuggestions)
         })
     })
   }, [])
@@ -184,6 +189,8 @@ export default function NewRecipePage() {
           </div>
         )}
 
+        {sourceUrl && <RecipeSourceLink url={sourceUrl} />}
+
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Input
             type="text"
@@ -236,7 +243,7 @@ export default function NewRecipePage() {
           <Label style={{ display: 'block', marginBottom: 8 }}>
             Tags <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span>
           </Label>
-          <TagInput tags={tags} onChange={setTags} />
+          <TagInput tags={tags} onChange={setTags} suggestions={tagSuggestions} />
         </div>
 
         {sectionLabel('Ingredients')}

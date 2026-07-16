@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { ChefPreferences, InventoryItem } from '@/lib/chefData'
-import { getCachedTonightSuggestions, getOrFetchTonightSuggestions, type Suggestion } from '@/lib/chefSuggestions'
+import { getCachedTonightSuggestions, getOrFetchTonightSuggestions, type MealIdea } from '@/lib/mealIdeas'
 import SuggestionDetailSheet from '@/components/chef/SuggestionDetailSheet'
 import AiLoadingCard from '@/components/chef/AiLoadingCard'
 import IngredientChipRow from '@/components/chef/IngredientChipRow'
@@ -26,21 +26,21 @@ const glassCard: React.CSSProperties = {
 }
 
 export default function ChefSuggestions({ inventory, priorityItems, defaultServings, preferences, householdId, userId }: Props) {
-  const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null)
+  const [suggestions, setSuggestions] = useState<MealIdea[] | null>(null)
   const [error, setError] = useState(false)
-  const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null)
+  const [selectedSuggestion, setSelectedSuggestion] = useState<MealIdea | null>(null)
 
   useEffect(() => {
     if (inventory.length === 0) return
 
     // Render the last-resolved result immediately, if any, so revisiting
     // this tab doesn't flash the loading state while the cache is re-read.
-    const cached = getCachedTonightSuggestions(false)
+    const cached = getCachedTonightSuggestions('strict')
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: restore the last-resolved suggestions on mount
     if (cached) setSuggestions(cached)
 
     let cancelled = false
-    getOrFetchTonightSuggestions({ inventory, priorityItems, defaultServings, allowShopping: false, preferences })
+    getOrFetchTonightSuggestions({ inventory, priorityItems, defaultServings, shoppingMode: 'strict', preferences })
       .then(data => {
         if (cancelled) return
         if (data) setSuggestions(data)
@@ -92,7 +92,7 @@ export default function ChefSuggestions({ inventory, priorityItems, defaultServi
             >
               <div className="flex flex-col gap-1.5" style={{ flex: 1, minWidth: 0 }}>
                 <span className="text-13 font-bold" style={{ color: 'var(--foreground)' }}>{s.idea}</span>
-                <IngredientChipRow ingredients={s.ingredients_used} />
+                <IngredientChipRow ingredients={s.ingredients.filter(i => i.have_on_hand)} />
               </div>
               <i className="fi-rr-angle-right" style={{ fontSize: 14, display: 'block', flexShrink: 0, color: 'var(--muted)' }} />
             </div>

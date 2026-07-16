@@ -1,4 +1,5 @@
 import type { RecipeData, RecipeIngredientData } from './RecipeTabs'
+import RecipeSourceLink from '@/components/chef/RecipeSourceLink'
 
 interface Props {
   recipe: RecipeData
@@ -69,18 +70,7 @@ export default function CookView({ recipe, ingredients }: Props) {
         </div>
       )}
 
-      {recipe.source_url && (
-        <a
-          href={recipe.source_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-105 font-semibold"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start', color: 'var(--amber)', textDecoration: 'none' }}
-        >
-          View original recipe
-          <i className="fi-rr-arrow-up-right-from-square" style={{ fontSize: 11, display: 'block' }} />
-        </a>
-      )}
+      {recipe.source_url && <RecipeSourceLink url={recipe.source_url} />}
     </div>
   )
 }

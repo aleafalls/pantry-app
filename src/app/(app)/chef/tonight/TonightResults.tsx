@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { ChefPreferences, InventoryItem } from '@/lib/chefData'
-import { getCachedTonightSuggestions, getOrFetchTonightSuggestions, refetchTonightSuggestions, type Suggestion } from '@/lib/chefSuggestions'
+import { getCachedTonightSuggestions, getOrFetchTonightSuggestions, refetchTonightSuggestions, type MealIdea } from '@/lib/mealIdeas'
 import SuggestionDetailSheet from '@/components/chef/SuggestionDetailSheet'
 import IngredientChipRow from '@/components/chef/IngredientChipRow'
 
@@ -25,11 +25,11 @@ const glassCard: React.CSSProperties = {
 }
 
 export default function TonightResults({ inventory, priorityItems, defaultServings, preferences, strictOnly, householdId, userId }: Props) {
-  const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null)
+  const [suggestions, setSuggestions] = useState<MealIdea[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(false)
-  const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null)
+  const [selectedSuggestion, setSelectedSuggestion] = useState<MealIdea | null>(null)
   // Tracks the `strictOnly` value we last actually fetched for — not just
   // whether this is the "first" effect run. A plain `isFirstLoad` boolean
   // ref breaks under React's dev-mode Strict Mode double-invoke: the ghost
@@ -37,10 +37,10 @@ export default function TonightResults({ inventory, priorityItems, defaultServin
   // itself for a real toggle change, and fires a second, unwanted fetch.
   const lastLoadedStrictOnly = useRef<boolean | null>(null)
 
-  function loadSuggestions(allowShoppingValue: boolean, fresh: boolean, hasCached: boolean) {
+  function loadSuggestions(shoppingMode: 'strict' | 'minor_extras', fresh: boolean, hasCached: boolean) {
     if (!hasCached) setLoading(true)
     setError(false)
-    const params = { inventory, priorityItems, defaultServings, allowShopping: allowShoppingValue, preferences }
+    const params = { inventory, priorityItems, defaultServings, shoppingMode, preferences }
     const promise = fresh ? refetchTonightSuggestions(params) : getOrFetchTonightSuggestions(params)
     promise
       .then(data => {
@@ -53,7 +53,8 @@ export default function TonightResults({ inventory, priorityItems, defaultServin
 
   function loadMoreSuggestions() {
     setLoadingMore(true)
-    const params = { inventory, priorityItems, defaultServings, allowShopping: !strictOnly, preferences }
+    const shoppingMode = strictOnly ? 'strict' as const : 'minor_extras' as const
+    const params = { inventory, priorityItems, defaultServings, shoppingMode, preferences }
     refetchTonightSuggestions(params)
       .then(data => {
         if (data) setSuggestions(prev => (prev ? [...prev, ...data] : data))
@@ -74,9 +75,11 @@ export default function TonightResults({ inventory, priorityItems, defaultServin
     // On a page revisit (first mount of this instance), render the
     // last-resolved suggestions immediately instead of flashing the
     // loading state while the cache is re-read.
+    const shoppingMode = strictOnly ? 'strict' as const : 'minor_extras' as const
+
     let hasCached = false
     if (wasFirstLoad) {
-      const cached = getCachedTonightSuggestions(!strictOnly)
+      const cached = getCachedTonightSuggestions(shoppingMode)
       if (cached) {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: restore the last-resolved suggestions on mount
         setSuggestions(cached)
@@ -84,7 +87,7 @@ export default function TonightResults({ inventory, priorityItems, defaultServin
       }
     }
 
-    loadSuggestions(!strictOnly, fresh, hasCached)
+    loadSuggestions(shoppingMode, fresh, hasCached)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-fetch only on toggle change, not on inventory/priorityItems/defaultServings identity
   }, [strictOnly])
 
@@ -118,15 +121,15 @@ export default function TonightResults({ inventory, priorityItems, defaultServin
                 <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
                   Uses
                 </span>
-                <IngredientChipRow ingredients={s.ingredients_used} />
+                <IngredientChipRow ingredients={s.ingredients.filter(i => i.have_on_hand)} />
               </div>
 
-              {s.ingredients_needed.some(ing => !ing.is_staple) && (
+              {s.ingredients.some(i => !i.have_on_hand && !i.is_staple) && (
                 <div className="flex flex-col gap-1">
                   <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
                     You&apos;d need
                   </span>
-                  <IngredientChipRow ingredients={s.ingredients_needed} variant="needed" />
+                  <IngredientChipRow ingredients={s.ingredients.filter(i => !i.have_on_hand)} variant="needed" />
                 </div>
               )}
             </div>

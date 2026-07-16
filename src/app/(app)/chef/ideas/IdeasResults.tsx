@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { ChefPreferences, InventoryItem } from '@/lib/chefData'
-import { fetchRecipeIdeas, getCachedRecipeIdeas, matchPercent, setCachedRecipeIdeas, type RecipeIdea } from '@/lib/recipeIdeas'
+import { fetchRecipeIdeas, getCachedRecipeIdeas, matchPercent, setCachedRecipeIdeas, type MealIdea } from '@/lib/mealIdeas'
 import { getRandomPrompts } from '@/lib/recipePrompts'
 import AiLoadingCard from '@/components/chef/AiLoadingCard'
 import RecipeIdeaSearchBox from '@/components/chef/RecipeIdeaSearchBox'
@@ -31,11 +31,11 @@ export default function IdeasResults({ inventory, defaultServings, preferences, 
   const [inputValue, setInputValue] = useState(query ?? '')
   const [starterPrompts, setStarterPrompts] = useState<string[]>([])
   const [activeQuery, setActiveQuery] = useState(query)
-  const [suggestions, setSuggestions] = useState<RecipeIdea[] | null>(null)
+  const [suggestions, setSuggestions] = useState<MealIdea[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState(false)
-  const [selectedIdea, setSelectedIdea] = useState<RecipeIdea | null>(null)
+  const [selectedIdea, setSelectedIdea] = useState<MealIdea | null>(null)
   // Guards the mount effect below against React's dev-mode double-invoke
   // (Strict Mode fires effects twice) — without this, the initial search
   // fires two requests, and whichever resolves last (success or error)
@@ -177,7 +177,7 @@ export default function IdeasResults({ inventory, defaultServings, preferences, 
                 style={{ ...glassCard, cursor: 'pointer' }}
               >
                 <div className="flex items-start justify-between gap-2">
-                  <span className="text-base font-bold" style={{ color: 'var(--foreground)' }}>{s.recipe_name}</span>
+                  <span className="text-base font-bold" style={{ color: 'var(--foreground)' }}>{s.idea}</span>
                   <span
                     className="text-105 font-extrabold px-2 py-0.5 rounded-full"
                     style={{ background: 'color-mix(in srgb, var(--teal) 20%, white)', color: 'var(--foreground)', flexShrink: 0 }}
@@ -186,7 +186,7 @@ export default function IdeasResults({ inventory, defaultServings, preferences, 
                   </span>
                 </div>
                 <span className="text-sm" style={{ color: 'var(--muted)' }}>{s.description}</span>
-                <span className="text-105" style={{ color: 'var(--muted)' }}>Serves {s.servings}</span>
+                <span className="text-105" style={{ color: 'var(--muted)' }}>Serves {defaultServings}</span>
 
                 <div className="flex flex-wrap gap-1.5 mt-1">
                   {s.ingredients.slice(0, 5).map(ing => (
@@ -235,6 +235,7 @@ export default function IdeasResults({ inventory, defaultServings, preferences, 
         recipeIdea={selectedIdea}
         onOpenChange={open => !open && setSelectedIdea(null)}
         inventory={inventory}
+        defaultServings={defaultServings}
         householdId={householdId}
         userId={userId}
       />

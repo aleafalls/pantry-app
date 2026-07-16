@@ -5,13 +5,12 @@ import { useRouter } from 'next/navigation'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { createClient } from '@/lib/supabase/client'
 import type { InventoryItem } from '@/lib/chefData'
-import type { Suggestion, SuggestionIngredient } from '@/lib/chefSuggestions'
-import { simplifyIdeaForQuery } from '@/lib/suggestionQuery'
-import RecipeIdeaSearchBox from './RecipeIdeaSearchBox'
+import type { MealIdea, MealIdeaIngredient } from '@/lib/mealIdeas'
+import { findAndImportRecipe } from '@/lib/findRecipe'
 import CompactStepper from './CompactStepper'
 
 interface Props {
-  suggestion: Suggestion | null
+  suggestion: MealIdea | null
   onOpenChange: (open: boolean) => void
   inventory: InventoryItem[]
   householdId: string
@@ -56,7 +55,7 @@ function matchIngredient(name: string, inventory: InventoryItem[]): IngredientMa
   return { rows, total, unit: primary.unit, itemId: primary.itemId }
 }
 
-function dedupeIngredients(ingredients: SuggestionIngredient[]): SuggestionIngredient[] {
+function dedupeIngredients(ingredients: MealIdeaIngredient[]): MealIdeaIngredient[] {
   const seen = new Set<string>()
   return ingredients.filter(ing => {
     const key = ing.name.trim().toLowerCase()
@@ -67,7 +66,7 @@ function dedupeIngredients(ingredients: SuggestionIngredient[]): SuggestionIngre
 }
 
 interface BodyProps {
-  suggestion: Suggestion
+  suggestion: MealIdea
   inventory: InventoryItem[]
   householdId: string
   userId: string
@@ -75,10 +74,11 @@ interface BodyProps {
 
 function SuggestionDetailBody({ suggestion, inventory, householdId, userId }: BodyProps) {
   const router = useRouter()
-  const [queryInput, setQueryInput] = useState(() => simplifyIdeaForQuery(suggestion.idea))
+  const [findingRecipe, setFindingRecipe] = useState<'searching' | 'reading' | null>(null)
+  const [findError, setFindError] = useState<string | null>(null)
 
   const allIngredients = useMemo(
-    () => dedupeIngredients([...suggestion.ingredients_used, ...suggestion.ingredients_needed]),
+    () => dedupeIngredients(suggestion.ingredients),
     [suggestion]
   )
 
@@ -102,9 +102,20 @@ function SuggestionDetailBody({ suggestion, inventory, householdId, userId }: Bo
 
   const dirty = Object.keys(baselineQty).some(name => pendingQty[name] !== baselineQty[name])
 
-  function goToRecipeIdeas() {
-    const trimmed = queryInput.trim()
-    router.push(trimmed ? `/chef/ideas?q=${encodeURIComponent(trimmed)}` : '/chef/ideas')
+  async function handleFindRecipe() {
+    setFindError(null)
+    const keyIngredients = suggestion.ingredients.filter(i => !i.is_staple).map(i => i.name).slice(0, 4)
+    const outcome = await findAndImportRecipe(suggestion.idea, keyIngredients, stage => setFindingRecipe(stage))
+    setFindingRecipe(null)
+    if (outcome.status === 'success') {
+      router.push('/chef/new')
+    } else if (outcome.status === 'not_found') {
+      setFindError("Couldn't find a good match for this online — try tweaking the idea and searching below.")
+    } else if (outcome.status === 'import_failed') {
+      setFindError(outcome.message)
+    } else {
+      setFindError('Something went wrong — try again.')
+    }
   }
 
   async function handleAddToList(name: string, itemId: string | null) {
@@ -185,12 +196,28 @@ function SuggestionDetailBody({ suggestion, inventory, householdId, userId }: Bo
         <p className="text-sm" style={{ color: 'var(--muted)' }}>{suggestion.description}</p>
       </div>
 
-      <RecipeIdeaSearchBox
-        value={queryInput}
-        onChange={setQueryInput}
-        onSubmit={goToRecipeIdeas}
-        instructionText="Want a more detailed recipe? Search based on this idea, or tweak it first."
-      />
+      <button
+        type="button"
+        onClick={handleFindRecipe}
+        disabled={!!findingRecipe}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          padding: '14px 16px', borderRadius: 14, border: 'none',
+          background: 'linear-gradient(150deg, var(--yellow-light), var(--yellow))',
+          color: '#4A3300', fontSize: 15, fontWeight: 700,
+          cursor: findingRecipe ? 'default' : 'pointer', fontFamily: 'inherit',
+        }}
+      >
+        {findingRecipe && (
+          <i className="fi-rr-rotate-right" style={{ fontSize: 14, display: 'block', lineHeight: 1, animation: 'spin 1s linear infinite' }} />
+        )}
+        {findingRecipe === 'searching' && 'Finding a recipe…'}
+        {findingRecipe === 'reading' && 'Reading the recipe…'}
+        {!findingRecipe && 'Find a Full Recipe'}
+      </button>
+      {findError && (
+        <p className="text-sm" style={{ color: 'var(--red)', margin: 0 }}>{findError}</p>
+      )}
 
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2">

@@ -1,13 +1,13 @@
 # Item Enrichment
 
 **Phase:** 13
-**Status:** Designed, not yet built
+**Status:** Built
 **Endpoint:** `src/app/api/ai/enrich-item/route.ts`
 **Model:** `claude-haiku-4-5` — no `thinking`/`effort` params (Haiku 4.5 doesn't support them; this is a plain classification/lookup task that doesn't need reasoning)
 
 ## Purpose
 
-Fills in details the New Item form doesn't collect from the user (emoji, estimated price) and offers best-effort suggestions for fields the user may not have set yet (category, unit, storage location) — without ever overwriting a value the user already chose.
+Fills in details the New Item form doesn't collect from the user (emoji, estimated price, canonical name) and offers best-effort suggestions for fields the user may not have set yet (category, unit, storage location) — without ever overwriting a value the user already chose.
 
 ## Trigger points
 
@@ -24,31 +24,28 @@ Both call the same client-side function against the same endpoint, using whateve
 | `category` | Form's current category value, may be empty |
 | `unit` | Form's current unit value (defaults to `each`) |
 | `location` | Form's current storage-location value (defaults to `pantry`) |
-| `city`, `state` | Household region, from Settings — regional price context, unrelated to storage location |
+| `city`, `state` | Household region, from Settings — regional price context, unrelated to storage location. Falls back to `'unknown — use typical US grocery pricing'` when neither is set. |
 | `shopping_tier` | Household shopping-tier slider (1–5), from Settings — see mapping below |
 
 ## Output (structured, via Zod schema + `client.messages.parse()`)
 
 ```ts
-const ItemEnrichmentSchema = z.object({
-  category: z.enum([
-    'Canned Goods', 'Dry Goods & Grains', 'Baking', 'Condiments & Sauces',
-    'Snacks', 'Beverages', 'Frozen', 'Dairy & Refrigerated', 'Produce',
-    'Meat & Seafood', 'Spices & Seasonings', 'Pet Supplies', 'Household & Other',
-  ]).nullable().describe('Only set if confident based on the item name; null otherwise'),
-  unit: z.enum([
-    'each', 'pair', 'pack', 'box', 'bag', 'bunch', 'loaf', 'roll',
-    'fl oz', 'cup', 'pint', 'quart', 'gallon', 'ml', 'L',
-    'oz', 'lb', 'g', 'kg',
-    'can', 'jar', 'bottle', 'carton', 'pouch', 'tub', 'block', 'slice',
-  ]).nullable().describe('The most precise unit for how this item is typically sold/measured; null if "each" is already correct or not confident'),
-  location: z.enum([
-    'pantry', 'fridge', 'freezer', 'spice_rack', 'cleaning_supplies', 'garage_overflow',
-  ]).nullable().describe('Where this item is most likely stored in the home; null if "pantry" is already correct or not confident'),
+const EnrichmentSchema = z.object({
+  category: z.string().nullable()
+    .describe('Only set if confident based on the item name; null otherwise'),
+  unit: z.string().nullable()
+    .describe('The most precise unit for how this item is typically sold/measured; null if the current unit is already correct or not confident'),
+  location: z.string().nullable()
+    .describe('Where this item is most likely stored in the home; null if the current location is already correct or not confident'),
   emoji: z.string().describe('A single emoji that best represents this item — prefer food/product emojis over generic symbols'),
   estimated_price: z.number().describe('Estimated price in USD per one unit of the chosen/given unit'),
+  canonical_name: z.string().describe(`${CANONICAL_NAME_DESCRIPTION} Used to match this item against recipe ingredients written differently.`),
 })
 ```
+
+**`category`/`unit`/`location` are plain `z.string()`, not `z.enum(...)` as originally designed.** An enum mismatch throws and discards the *entire* parsed response — price, emoji, and canonical_name included — so one unmapped suggestion on any of these three fields shouldn't be able to sink the other three. Valid values are enforced afterward server-side with a small `coerceEnum(value, validValues)` helper (returns `null` if the model's value isn't in the list) instead of relying on Zod to reject at parse time.
+
+`canonical_name` (added after initial build, shared with [Recipe Ideas](recipe-ideas.md)'s save flow and [Web Recipe Extraction](web-recipe-extraction.md)) uses `CANONICAL_NAME_DESCRIPTION` from `src/lib/canonicalIngredient.ts` — the same description string every canonicalization prompt in the app shares, so "extra virgin olive oil," "EVOO," and "olive oil" from a recipe all resolve to the same canonical form for inventory matching.
 
 ## Fill rules (client-side, after the response comes back)
 
@@ -59,6 +56,7 @@ const ItemEnrichmentSchema = z.object({
 | `location` | Only if the form's storage location is currently still `pantry` (the default) |
 | `emoji` | Only if the form's emoji is currently still `📦` (the default) — never overwrites a manually picked emoji |
 | `estimated_price` | Always — nothing else in the form sets this |
+| `canonical_name` | Always — stored on the item row, not a form field the user edits directly |
 
 ## Shopping tier → prompt text mapping
 
@@ -78,7 +76,7 @@ Passed as qualitative context rather than a numeric price multiplier — a flat 
 
 **System:**
 ```
-You help a household pantry app enrich a new grocery item with details it doesn't have yet: category, unit, storage location, emoji, and estimated price. Only suggest a category, unit, or storage location if you're reasonably confident based on the item name — leave it null rather than guess. Emoji and price should always be provided.
+You help a household pantry app enrich a new grocery item with details it doesn't have yet: category, unit, storage location, emoji, estimated price, and a canonical name. Only suggest a category, unit, or storage location if you're reasonably confident based on the item name — leave it null rather than guess. Emoji, price, and canonical name should always be provided.
 ```
 
 **User:**
@@ -87,7 +85,7 @@ Item: {name}
 Category: {category || '(not yet set)'}
 Unit: {unit} (currently the default — suggest a more precise one if appropriate)
 Storage location: {location} (currently the default — suggest a more precise one if appropriate)
-Region: {city}, {state}
+Region: {region}
 Shopping style: This household {shopping_tier_description}.
 
 Valid categories: Canned Goods, Dry Goods & Grains, Baking, Condiments & Sauces, Snacks, Beverages, Frozen, Dairy & Refrigerated, Produce, Meat & Seafood, Spices & Seasonings, Pet Supplies, Household & Other
@@ -97,8 +95,6 @@ Valid units: each, pair, pack, box, bag, bunch, loaf, roll, fl oz, cup, pint, qu
 Valid storage locations: pantry, fridge, freezer, spice_rack, cleaning_supplies, garage_overflow
 ```
 
-## Open items before implementation
+## Open items
 
-- `items.estimated_price` and `households.shopping_tier` columns don't exist yet — migrations needed (same pattern as `items.barcode` in Phase 12).
-- Shopping-tier slider UI in Settings not yet built.
-- `location` was added as an output field after the category/location taxonomy was expanded (Cleaning Supplies, Garage/Overflow) and a Pet Supplies category was added — not yet tested live with the new values.
+- No automated eval of category/unit/location/canonical_name accuracy — quality has only been checked by spot-testing real items, not a structured pass.

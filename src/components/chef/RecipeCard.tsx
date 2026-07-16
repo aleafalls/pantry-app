@@ -74,7 +74,7 @@ export default function RecipeCard({ id, name, emoji, imageUrl, source, matchPer
             position: 'absolute', top: 8, right: 8,
             padding: '4px 8px', borderRadius: 99,
             background: 'color-mix(in srgb, var(--teal) 25%, white)',
-            fontSize: 11, fontWeight: 800, color: 'var(--foreground)',
+            fontSize: 11, fontWeight: 800, color: 'var(--foreground)', lineHeight: 1,
           }}
         >
           {matchPercent}%

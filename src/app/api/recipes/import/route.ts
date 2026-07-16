@@ -3,6 +3,7 @@ import { isIP } from 'node:net'
 import { lookup } from 'node:dns/promises'
 import { Agent } from 'undici'
 import * as cheerio from 'cheerio'
+import { decodeHTML } from 'entities'
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
@@ -84,15 +85,28 @@ async function validateImportUrl(rawUrl: string): Promise<ValidatedUrl> {
 // domain can pass validation by answering the DNS lookup with a public IP,
 // then answer the real connection moments later with a private/internal one
 // ("DNS rebinding"), defeating the check above entirely.
+//
+// Must support both dns.lookup() callback shapes: the legacy single-address
+// form callback(err, address, family) and the array form callback(err,
+// [{address, family}]) requested via options.all. Node's net/tls connect
+// requests the array form whenever autoSelectFamily (Happy Eyeballs) is
+// active — the default since Node 18.13 — to race candidate addresses. A
+// lookup that only implements the single-address form breaks silently under
+// that default: the caller misreads the bare IP string as an address array,
+// and every pinned fetch fails with "Invalid IP address: undefined".
 function pinnedDispatcher(hostname: string, ip: string, family: 4 | 6): Agent {
   return new Agent({
     connect: {
-      lookup: (host, _options, callback) => {
+      lookup: (host, options, callback) => {
         if (host !== hostname) {
           callback(new Error('Blocked: unexpected host during pinned fetch'), '', 0)
           return
         }
-        callback(null, ip, family)
+        if (options.all) {
+          callback(null, [{ address: ip, family }])
+        } else {
+          callback(null, ip, family)
+        }
       },
     },
   })
@@ -112,31 +126,56 @@ async function fetchRecipePage(rawUrl: string): Promise<string> {
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const { url, ip, family } = await validateImportUrl(currentUrl)
     const dispatcher = pinnedDispatcher(url.hostname, ip, family)
-    let res: Response
+    // The dispatcher must stay open until the response body is fully read
+    // (or explicitly cancelled) — closing it beforehand leaves the body
+    // stream dangling, and dispatcher.close() then hangs waiting for it to
+    // drain until the fetch's own abort signal eventually force-kills the
+    // connection, which then makes the body read fail anyway.
     try {
-      res = await fetch(url.toString(), {
+      const res = await fetch(url.toString(), {
         headers: FETCH_HEADERS,
         signal: AbortSignal.timeout(10000),
         redirect: 'manual',
         dispatcher,
       } as RequestInit & { dispatcher: Agent })
+
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get('location')
+        await res.body?.cancel()
+        if (!location) throw new Error('Redirect with no location header.')
+        currentUrl = new URL(location, url).toString()
+        continue
+      }
+      if (!res.ok) {
+        await res.body?.cancel()
+        throw new Error(`Unexpected status ${res.status}`)
+      }
+      return await res.text()
     } finally {
       await dispatcher.close()
     }
-
-    if (res.status >= 300 && res.status < 400) {
-      const location = res.headers.get('location')
-      if (!location) throw new Error('Redirect with no location header.')
-      currentUrl = new URL(location, url).toString()
-      continue
-    }
-    if (!res.ok) throw new Error(`Unexpected status ${res.status}`)
-    return await res.text()
   }
   throw new Error('Too many redirects.')
 }
 
 // ── schema.org JSON-LD extraction ──────────────────────────
+
+// Some sites' templating runs JSON-LD output through the same HTML-escaping
+// filters used for regular page content, leaving literal entities (e.g.
+// "4&#32;zucchini", "shouldn&#39;t") inside otherwise-valid JSON string
+// values. Decode every string in the parsed tree before it reaches any
+// extraction helper, so the fix applies to name/ingredients/instructions/
+// tags uniformly instead of needing a decode call at each call site.
+function decodeEntitiesDeep<T>(value: T): T {
+  if (typeof value === 'string') return decodeHTML(value) as T
+  if (Array.isArray(value)) return value.map(decodeEntitiesDeep) as T
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [key, val] of Object.entries(value)) out[key] = decodeEntitiesDeep(val)
+    return out as T
+  }
+  return value
+}
 
 function findRecipeNode(data: unknown): Record<string, unknown> | null {
   if (!data) return null
@@ -368,6 +407,7 @@ export async function POST(request: Request) {
     if (err instanceof ImportValidationError) {
       return NextResponse.json({ error: err.message }, { status: 400 })
     }
+    console.error('recipes/import: fetchRecipePage failed:', err)
     return NextResponse.json({ error: "Couldn't load that page — it may be blocking automated requests." }, { status: 502 })
   }
 
@@ -377,7 +417,7 @@ export async function POST(request: Request) {
   $('script[type="application/ld+json"]').each((_, el) => {
     if (recipeNode) return
     try {
-      const parsed = JSON.parse($(el).contents().text())
+      const parsed = decodeEntitiesDeep(JSON.parse($(el).contents().text()))
       recipeNode = findRecipeNode(parsed)
     } catch {
       // malformed JSON-LD block — skip it

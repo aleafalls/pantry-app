@@ -55,7 +55,7 @@ export default function RecipeIdeaSearchBox({ value, onChange, onSubmit, instruc
         </button>
       </div>
 
-      <p className="text-105" style={{ position: 'relative', zIndex: 1, color: '#7A5200', margin: 0, lineHeight: 1.5 }}>
+      <p className="text-115" style={{ position: 'relative', zIndex: 1, color: '#7A5200', margin: 0, lineHeight: 1.5 }}>
         {instructionText}
       </p>
     </div>

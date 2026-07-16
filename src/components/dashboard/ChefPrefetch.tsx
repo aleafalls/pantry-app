@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { prewarmTonightSuggestions } from '@/lib/chefSuggestions'
+import { prewarmTonightSuggestions } from '@/lib/mealIdeas'
 import type { ChefPreferences, InventoryItem } from '@/lib/chefData'
 
 interface Props {
@@ -15,7 +15,7 @@ interface Props {
 // mount so the Chef tab and Tonight page load with results already in hand.
 export default function ChefPrefetch({ inventory, priorityItems, defaultServings, preferences }: Props) {
   useEffect(() => {
-    prewarmTonightSuggestions({ inventory, priorityItems, defaultServings, allowShopping: false, preferences })
+    prewarmTonightSuggestions({ inventory, priorityItems, defaultServings, shoppingMode: 'strict', preferences })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once on mount; props come from the server-rendered page and don't change during this component's lifetime
   }, [])
 
