@@ -43,7 +43,7 @@ export default function RunningLow({ items, totalLowCount }: Props) {
           <span className="text-135 font-extrabold uppercase tracking-003"
             style={{ color: 'var(--foreground)' }}>Running low</span>
           <Badge className="text-11 font-extrabold px-1.5 rounded-full"
-            style={{ background: 'linear-gradient(135deg, #EE1B49, #C81440)', color: '#fff', border: 'none' }}>
+            style={{ background: 'linear-gradient(135deg, #EE1B49, #C81440)', color: '#fff', border: 'none', lineHeight: 1 }}>
             {totalLowCount}
           </Badge>
         </div>

@@ -57,7 +57,7 @@ export function FilterChip({ label, count, active, onClick }: { label: string; c
           className="inline-flex items-center justify-center text-11 font-extrabold"
           style={{
             minWidth: 18, height: 18, borderRadius: 99, padding: '0 5px',
-            background: '#4A3300', color: 'var(--yellow-light)',
+            background: '#4A3300', color: 'var(--yellow-light)', lineHeight: 1,
           }}
         >
           {count}

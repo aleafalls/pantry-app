@@ -16,6 +16,7 @@ import QuantityStepper from '@/components/add/QuantityStepper'
 import TagInput from '@/components/add/TagInput'
 import { CATEGORIES, UNITS_GROUPED, LOCATIONS } from '@/lib/constants'
 import { getOrFetchEnrichment, refetchEnrichment, type EnrichmentResult } from '@/lib/enrichment'
+import { fetchItemTagSuggestions } from '@/lib/tagSuggestions'
 
 function NewItemForm() {
   const router = useRouter()
@@ -48,6 +49,7 @@ function NewItemForm() {
   const [category, setCategory] = useState(searchParams.get('category') ?? '')
   const [preferredStores, setPreferredStores] = useState<string[]>([])
   const [householdStores, setHouseholdStores] = useState<string[]>([])
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
   const [tags, setTags] = useState<string[]>(() => {
     const raw = searchParams.get('tags')
     return raw ? raw.split(',').filter(Boolean) : []
@@ -90,6 +92,7 @@ function NewItemForm() {
           setHouseholdId(profile.household_id)
           supabase.from('stores').select('name').eq('household_id', profile.household_id).order('name')
             .then(({ data }) => setHouseholdStores((data ?? []).map(s => s.name)))
+          fetchItemTagSuggestions(profile.household_id).then(setTagSuggestions)
 
           const household = profile.households as unknown as { city: string | null; state: string | null; shopping_tier: number } | null
           setHouseholdCity(household?.city ?? null)
@@ -382,7 +385,7 @@ function NewItemForm() {
           <Label style={{ display: 'block', marginBottom: 8 }}>
             Tags <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span>
           </Label>
-          <TagInput tags={tags} onChange={setTags} />
+          <TagInput tags={tags} onChange={setTags} suggestions={tagSuggestions} />
         </div>
 
         <Button

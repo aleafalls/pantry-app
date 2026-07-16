@@ -14,6 +14,7 @@ import EmojiPicker from '@/components/ui/EmojiPicker'
 import QuantityStepper from '@/components/add/QuantityStepper'
 import TagInput from '@/components/add/TagInput'
 import { LOCATIONS, UNITS_GROUPED, CATEGORIES } from '@/lib/constants'
+import { fetchItemTagSuggestions } from '@/lib/tagSuggestions'
 
 interface InventoryRow {
   id: string
@@ -81,6 +82,7 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
   const [categoryValue, setCategoryValue] = useState(item.category)
   const [preferredStores, setPreferredStores] = useState<string[]>(item.preferred_stores ?? [])
   const [householdStores, setHouseholdStores] = useState<string[]>([])
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
   const [autoShoppingList, setAutoShoppingList] = useState(item.auto_shopping_list ?? true)
   const [addedToList, setAddedToList] = useState(false)
   const [shoppingQty, setShoppingQty] = useState<number | null>(null)
@@ -237,6 +239,7 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
           supabase.from('stores').select('name').eq('household_id', profile.household_id)
             .order('name')
             .then(({ data }) => setHouseholdStores((data ?? []).map(s => s.name)))
+          fetchItemTagSuggestions(profile.household_id).then(setTagSuggestions)
         })
     })
   }, [])
@@ -590,7 +593,7 @@ export default function ItemDetail({ item, inventoryRows, userId }: Props) {
 
                 <div>
                   <Label style={{ display: 'block', marginBottom: 8 }}>Tags</Label>
-                  <TagInput tags={tags} onChange={saveTags} />
+                  <TagInput tags={tags} onChange={saveTags} suggestions={tagSuggestions} />
                 </div>
 
                 {mostRecent && (
