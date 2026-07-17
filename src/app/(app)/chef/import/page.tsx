@@ -142,7 +142,7 @@ export default function ImportRecipePage() {
             {photoLoading ? 'Reading your recipe…' : 'Take or upload a photo'}
           </span>
           <span className="text-11" style={{ color: 'var(--muted)' }}>
-            A cookbook page, recipe card, or printout
+            Cookbook page, recipe card, screenshot, etc.
           </span>
         </button>
 

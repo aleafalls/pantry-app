@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
@@ -24,6 +24,10 @@ const glassField = {
   color: 'var(--foreground)',
 }
 
+const ACCEPTED_PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024
+const SIGNED_URL_SECONDS = 60 * 60 * 24 * 365 * 10 // 10 years — long enough to read as permanent
+
 interface Props {
   recipe: RecipeData
   ingredients: RecipeIngredientData[]
@@ -45,6 +49,8 @@ export default function EditView({ recipe, ingredients: initialIngredients, hous
   )
   const [instructions, setInstructions] = useState(recipe.instructions ?? '')
   const [imageUrl, setImageUrl] = useState(recipe.image_url)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const photoInputRef = useRef<HTMLInputElement>(null)
 
   const [saving, setSaving] = useState(false)
   const [removing, setRemoving] = useState(false)
@@ -126,6 +132,44 @@ export default function EditView({ recipe, ingredients: initialIngredients, hous
     router.push('/chef/saved')
   }
 
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file after an error
+    if (!file) return
+    if (!ACCEPTED_PHOTO_TYPES.has(file.type)) {
+      toast.error('Please use a JPG, PNG, WEBP, or GIF photo.')
+      return
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      toast.error('That photo is too large — try a smaller image.')
+      return
+    }
+
+    setUploadingPhoto(true)
+    const supabase = createClient()
+    const ext = file.type.split('/')[1] ?? 'jpg'
+    const path = `${householdId}/${recipe.id}-${crypto.randomUUID()}.${ext}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('recipe-photos')
+      .upload(path, file, { contentType: file.type })
+    if (uploadError) {
+      toast.error(uploadError.message)
+      setUploadingPhoto(false)
+      return
+    }
+
+    const { data: signed, error: signError } = await supabase.storage
+      .from('recipe-photos')
+      .createSignedUrl(path, SIGNED_URL_SECONDS)
+    setUploadingPhoto(false)
+    if (signError || !signed?.signedUrl) {
+      toast.error(signError?.message ?? "Couldn't load that photo.")
+      return
+    }
+    setImageUrl(signed.signedUrl)
+  }
+
   const sectionLabel = (label: string) => (
     <div style={{ padding: '8px 0 4px' }}>
       <span className="text-11 font-extrabold uppercase tracking-003" style={{ color: 'var(--muted)' }}>
@@ -144,7 +188,7 @@ export default function EditView({ recipe, ingredients: initialIngredients, hous
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {imageUrl && (
+      {imageUrl ? (
         <div style={{ position: 'relative', borderRadius: 14, overflow: 'hidden', height: 200 }}>
           {/* eslint-disable-next-line @next/next/no-img-element -- external/user-supplied recipe photo URL, not a local/static asset */}
           <img src={imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -160,6 +204,40 @@ export default function EditView({ recipe, ingredients: initialIngredients, hous
             }}
           >
             <i className="fi-rr-cross-small" style={{ fontSize: 14, display: 'block' }} />
+          </button>
+        </div>
+      ) : (
+        <div
+          style={{
+            position: 'relative', borderRadius: 14, height: 200,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'oklch(100% 0 0 / 0.4)',
+            border: '1.5px dashed oklch(60% 0.02 85 / 0.4)',
+          }}
+        >
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handlePhotoChange}
+            style={{ display: 'none' }}
+          />
+          <button
+            type="button"
+            onClick={() => photoInputRef.current?.click()}
+            disabled={uploadingPhoto}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8, border: 'none', borderRadius: 99,
+              padding: '12px 16px',
+              background: 'linear-gradient(150deg, var(--yellow-light), var(--yellow))',
+              color: '#4A3300', fontWeight: 700, cursor: uploadingPhoto ? 'default' : 'pointer',
+            }}
+          >
+            <i
+              className={uploadingPhoto ? 'fi-rr-rotate-right' : 'fi-rr-camera'}
+              style={{ fontSize: 16, display: 'block', animation: uploadingPhoto ? 'spin 1s linear infinite' : 'none' }}
+            />
+            {uploadingPhoto ? 'Uploading…' : 'Add Photo'}
           </button>
         </div>
       )}

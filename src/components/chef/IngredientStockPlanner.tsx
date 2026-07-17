@@ -257,6 +257,9 @@ export default function IngredientStockPlanner({ ingredients: rawIngredients, in
 
   return (
     <div className="flex flex-col gap-6">
+      <p className="text-sm" style={{ color: 'var(--muted)' }}>
+        Here&apos;s what you have in stock and what&apos;s needed for this recipe. Make any stock adjustments as needed to keep your inventory up to date or add items directly to your Shopping List.
+      </p>
       {onHandIngredients.length > 0 && (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-2">
