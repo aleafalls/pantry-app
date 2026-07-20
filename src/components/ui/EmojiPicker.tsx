@@ -240,7 +240,7 @@ export default function EmojiPicker({
         </div>
 
         {/* Search — pinned bottom */}
-        <div className="shrink-0 px-5 pt-2 pb-7" style={{ borderTop: '1px solid var(--divider)' }}>
+        <div className="shrink-0 px-5 pt-2" style={{ borderTop: '1px solid var(--divider)', paddingBottom: 'calc(28px + env(safe-area-inset-bottom))' }}>
           <div className="relative">
             <i className="fi-rr-search" style={{
               position: 'absolute', left: 14, top: '50%',
