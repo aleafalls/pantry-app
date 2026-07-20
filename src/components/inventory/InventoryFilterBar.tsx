@@ -15,7 +15,9 @@ interface Props {
   onStockFiltersChange: (values: string[]) => void
 }
 
-const locationOptions: SelectOption[] = LOCATIONS.map(l => ({ value: l.value, label: `${l.emoji} ${l.label}` }))
+const locationOptions: SelectOption[] = [...LOCATIONS]
+  .sort((a, b) => a.label.localeCompare(b.label))
+  .map(l => ({ value: l.value, label: `${l.emoji} ${l.label}` }))
 const categoryOptions: SelectOption[] = CATEGORIES.map(c => ({ value: c, label: c }))
 const stockOptions: SelectOption[] = [
   { value: 'out', label: 'Out' },

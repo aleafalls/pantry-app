@@ -6,11 +6,13 @@ import RecipeTeaser from '@/components/dashboard/RecipeTeaser'
 import AddFirstItemCard from '@/components/dashboard/AddFirstItemCard'
 import RunningLow from '@/components/dashboard/RunningLow'
 import UseTheseUp from '@/components/dashboard/UseTheseUp'
+import MostlyInStockRecipes from '@/components/dashboard/MostlyInStockRecipes'
 import ChefPrefetch from '@/components/dashboard/ChefPrefetch'
 import DashboardRefresh from '@/components/dashboard/DashboardRefresh'
 import { getChefContext } from '@/lib/chefData'
 import { aggregateInventoryByItem, isRunningLow } from '@/lib/lowStock'
 import { tracksShelfLife, shelfLifeRatio } from '@/lib/shelfLife'
+import { computeMatchPercent, type MatchIngredient } from '@/lib/recipeMatch'
 
 interface DashboardInventoryRow {
   id: string
@@ -47,7 +49,7 @@ export default async function DashboardPage() {
 
   const household = profile.households as unknown as { id: string; name: string }
 
-  const [{ data: members }, { data: inventory }, chefContext] = await Promise.all([
+  const [{ data: members }, { data: inventory }, chefContext, { data: savedRecipes }] = await Promise.all([
     supabase
       .from('profiles')
       .select('display_name, avatar_emoji')
@@ -61,6 +63,10 @@ export default async function DashboardPage() {
       .eq('household_id', profile.household_id)
       .eq('items.active', true),
     getChefContext(supabase, profile.household_id),
+    supabase
+      .from('recipes')
+      .select('id, name, emoji, image_url, source')
+      .eq('household_id', profile.household_id),
   ])
 
   const allInventory = (inventory ?? []) as unknown as DashboardInventoryRow[]
@@ -83,6 +89,31 @@ export default async function DashboardPage() {
       shelfLifeRatio(b.purchase_date, b.items.category, b.location) -
       shelfLifeRatio(a.purchase_date, a.items.category, a.location))
     .slice(0, 8)
+
+  const recipeIds = (savedRecipes ?? []).map(r => r.id)
+  const { data: recipeIngredients } = recipeIds.length > 0
+    ? await supabase.from('recipe_ingredients').select('recipe_id, name, canonical_name, is_staple').in('recipe_id', recipeIds)
+    : { data: [] }
+
+  const ingredientsByRecipe = new Map<string, MatchIngredient[]>()
+  for (const ing of recipeIngredients ?? []) {
+    const list = ingredientsByRecipe.get(ing.recipe_id) ?? []
+    list.push({ name: ing.name, canonicalName: ing.canonical_name, isStaple: ing.is_staple })
+    ingredientsByRecipe.set(ing.recipe_id, list)
+  }
+
+  const mostlyInStockRecipes = (savedRecipes ?? [])
+    .map(recipe => ({
+      id: recipe.id,
+      name: recipe.name,
+      emoji: recipe.emoji,
+      imageUrl: recipe.image_url,
+      source: recipe.source,
+      matchPercent: computeMatchPercent(ingredientsByRecipe.get(recipe.id) ?? [], chefContext.inventory),
+    }))
+    .filter(recipe => recipe.matchPercent >= 70)
+    .sort((a, b) => b.matchPercent - a.matchPercent)
+    .slice(0, 6)
 
   const isEmpty = itemCount === 0
 
@@ -128,6 +159,7 @@ export default async function DashboardPage() {
             {isEmpty ? <AddFirstItemCard /> : <RecipeTeaser />}
             <RunningLow items={lowItems} totalLowCount={allLowItems.length} />
             {oldestItems.length > 0 && <UseTheseUp items={oldestItems} />}
+            <MostlyInStockRecipes recipes={mostlyInStockRecipes} />
           </div>
         </DashboardRefresh>
       </div>

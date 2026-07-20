@@ -34,26 +34,34 @@ interface IngredientMatch {
 // state below (matches, quantities, key props) is keyed by ing.name, so
 // duplicate names must be merged into one row before anything else touches
 // them — otherwise two entries silently share one stepper's state instead
-// of each tracking its own quantity.
+// of each tracking its own quantity. A genuine duplicate's quantity+unit
+// get folded into one descriptive string (they may have different units,
+// so there's no single coherent "unit" left) — but a non-duplicate
+// ingredient (the common case) keeps its quantity/unit as separate fields
+// unmodified, so callers that need the real unit (e.g. adding to the
+// shopping list) still have it.
 function mergeDuplicateIngredients(ingredients: PlannerIngredient[]): PlannerIngredient[] {
   const order: string[] = []
-  const merged = new Map<string, { ing: PlannerIngredient; parts: string[] }>()
+  const merged = new Map<string, PlannerIngredient[]>()
 
   for (const ing of ingredients) {
     const key = ing.name.trim().toLowerCase()
-    const part = [ing.quantity, ing.unit].filter(Boolean).join(' ').trim()
     const existing = merged.get(key)
     if (existing) {
-      if (part) existing.parts.push(part)
+      existing.push(ing)
     } else {
       order.push(key)
-      merged.set(key, { ing, parts: part ? [part] : [] })
+      merged.set(key, [ing])
     }
   }
 
   return order.map(key => {
-    const { ing, parts } = merged.get(key)!
-    return { ...ing, quantity: parts.length > 0 ? parts.join(' + ') : null, unit: null }
+    const entries = merged.get(key)!
+    if (entries.length === 1) return entries[0]
+    const parts = entries
+      .map(e => [e.quantity, e.unit].filter(Boolean).join(' ').trim())
+      .filter(Boolean)
+    return { ...entries[0], quantity: parts.length > 0 ? parts.join(' + ') : null, unit: null }
   })
 }
 
@@ -98,15 +106,17 @@ function distributeStockUpdate(rows: InventoryItem[], newTotal: number): Array<{
 }
 
 export default function IngredientStockPlanner({ ingredients: rawIngredients, inventory, householdId, userId }: Props) {
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- ingredients is stable per page load
-  const ingredients = useMemo(() => mergeDuplicateIngredients(rawIngredients), [])
+  // Recomputed whenever the ingredients prop actually changes (e.g. a
+  // servings adjustment rescales quantity text) — but baselineQty/
+  // pendingQty/addedToList below stay independent useState, so a servings
+  // change never wipes an in-progress stock edit or shopping-list state.
+  const ingredients = useMemo(() => mergeDuplicateIngredients(rawIngredients), [rawIngredients])
 
   const matches = useMemo(() => {
     const map = new Map<string, IngredientMatch | null>()
     for (const ing of ingredients) map.set(ing.name, matchIngredient(ing, inventory))
     return map
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- ingredients/inventory are stable per page load
-  }, [])
+  }, [ingredients, inventory])
 
   const [baselineQty, setBaselineQty] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {}
@@ -257,6 +267,9 @@ export default function IngredientStockPlanner({ ingredients: rawIngredients, in
 
   return (
     <div className="flex flex-col gap-6">
+      <p className="text-sm" style={{ color: 'var(--muted)' }}>
+        Here&apos;s what you have in stock and what&apos;s needed for this recipe. Make any stock adjustments as needed to keep your inventory up to date or add items directly to your Shopping List.
+      </p>
       {onHandIngredients.length > 0 && (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-2">
@@ -283,6 +296,8 @@ export default function IngredientStockPlanner({ ingredients: rawIngredients, in
           <div className="flex flex-col gap-2">
             {onHandIngredients.map(ing => {
               const match = matches.get(ing.name)!
+              const needed = parseLeadingQuantity(ing.quantity)
+              const shortBy = needed !== null && needed > match.total ? needed - match.total : 0
               return (
                 <div key={ing.name} className="flex items-center justify-between gap-3">
                   <div style={{ minWidth: 0 }}>
@@ -292,6 +307,11 @@ export default function IngredientStockPlanner({ ingredients: rawIngredients, in
                     {(ing.quantity || ing.unit) && (
                       <span className="text-105" style={{ color: 'var(--muted)' }}>
                         Recipe calls for {[ing.quantity, ing.unit].filter(Boolean).join(' ')}
+                        {shortBy > 0 && (
+                          <span style={{ color: 'var(--red)', fontWeight: 600 }}>
+                            {' '}— short {Number(shortBy.toFixed(2))}{match.unit ? ` ${match.unit}` : ''}
+                          </span>
+                        )}
                       </span>
                     )}
                   </div>

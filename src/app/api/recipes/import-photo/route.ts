@@ -15,7 +15,6 @@ const ImportedRecipeSchema = z.object({
   servings: z.number().nullable(),
   total_time_minutes: z.number().nullable(),
   course_type: z.string().nullable().describe(`Best match to one of: ${COURSE_TYPES.join(', ')} — or null if unclear`),
-  tags: z.array(z.string()).describe('A few short descriptive tags (cuisine, diet, etc.) — empty array if none fit'),
   ingredients: z.array(z.object({
     name: z.string(),
     quantity: z.string().describe('e.g. "2", "1 1/2" — empty string if not specified'),
@@ -93,7 +92,6 @@ export async function POST(request: Request) {
   return NextResponse.json({
     name: parsed.name.trim(),
     courseType: matchCourseType(parsed.course_type),
-    tags: parsed.tags.slice(0, 6),
     servings: parsed.servings ?? undefined,
     totalTimeMinutes: parsed.total_time_minutes ?? '',
     ingredients: parsed.ingredients,

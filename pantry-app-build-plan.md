@@ -930,6 +930,8 @@ create policy "Recipe ingredients writable by household" on public.recipe_ingred
 
 > **Addendum (Saved Recipes grid):** added `emoji text` to `recipes` — a per-recipe emoji for the standardized hero tile shown when there's no `image_url` yet (manual saves get it via the same `EmojiPicker` items use; AI-saved Recipe Ideas get one directly from the model's own response). Run: `alter table public.recipes add column emoji text;`
 
+> **Addendum (Serving size adjustments):** added `preferred_servings integer` to `recipes` — nullable, `null` means "no override, use `recipes.servings`." `recipes.servings` stays fixed as the baseline the `recipe_ingredients` quantities were written for (ingredient scaling divides by it); `preferred_servings` is the household's personal "I always make this many of this specific recipe" override, set via the Cook/Plan tabs' servings drawer's "Save Permanently" action. Deliberately a separate column from `households.default_servings`, which stays reserved for Tonight/Ideas suggestions and is untouched by this feature. Run: `alter table public.recipes add column preferred_servings integer;`
+
 ✅ **Verify:** Table Editor shows `recipes` and `recipe_ingredients` with RLS enabled.
 
 ---

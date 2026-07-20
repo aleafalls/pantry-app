@@ -296,33 +296,9 @@ function matchCourseType(value: unknown): string | null {
   return null
 }
 
-function extractTags(recipeNode: Record<string, unknown>): string[] {
-  // Keyed by lowercase so a cuisine echoed in keywords (very common in
-  // recipe-site SEO) doesn't survive as two case-variant duplicates.
-  const tags = new Map<string, string>()
-  const add = (value: string) => {
-    const trimmed = value.trim()
-    if (trimmed && !tags.has(trimmed.toLowerCase())) tags.set(trimmed.toLowerCase(), trimmed)
-  }
-  const cuisine = recipeNode.recipeCuisine
-  for (const c of Array.isArray(cuisine) ? cuisine : [cuisine]) {
-    if (typeof c === 'string') add(c)
-  }
-  const keywords = recipeNode.keywords
-  if (typeof keywords === 'string') {
-    for (const k of keywords.split(',')) add(k)
-  } else if (Array.isArray(keywords)) {
-    for (const k of keywords) {
-      if (typeof k === 'string') add(k)
-    }
-  }
-  return Array.from(tags.values()).slice(0, 6)
-}
-
 interface ImportedRecipe {
   name: string
   courseType: string | null
-  tags: string[]
   servings: number | null
   totalTimeMinutes: number | null
   ingredients: { name: string; quantity: string; unit: string }[]
@@ -338,7 +314,6 @@ function fromStructuredData(recipeNode: Record<string, unknown>): ImportedRecipe
   return {
     name,
     courseType: matchCourseType(recipeNode.recipeCategory),
-    tags: extractTags(recipeNode),
     servings: parseServings(recipeNode.recipeYield),
     totalTimeMinutes:
       parseIsoDurationMinutes(recipeNode.totalTime) ??
@@ -359,7 +334,6 @@ const ImportedRecipeSchema = z.object({
   servings: z.number().nullable(),
   total_time_minutes: z.number().nullable(),
   course_type: z.string().nullable().describe(`Best match to one of: ${COURSE_TYPES.join(', ')} — or null if unclear`),
-  tags: z.array(z.string()).describe('A few short descriptive tags (cuisine, diet, etc.) — empty array if none fit'),
   ingredients: z.array(z.object({
     name: z.string(),
     quantity: z.string().describe('e.g. "2", "1 1/2" — empty string if not specified'),
@@ -384,7 +358,6 @@ async function fromClaudeExtraction(pageText: string, imageUrl: string | null): 
   return {
     name: parsed.name.trim(),
     courseType: matchCourseType(parsed.course_type),
-    tags: parsed.tags.slice(0, 6),
     servings: parsed.servings,
     totalTimeMinutes: parsed.total_time_minutes,
     ingredients: parsed.ingredients,
@@ -444,7 +417,6 @@ export async function POST(request: Request) {
   return NextResponse.json({
     name: imported.name,
     courseType: imported.courseType ?? '',
-    tags: imported.tags,
     servings: imported.servings ?? undefined,
     totalTimeMinutes: imported.totalTimeMinutes ?? '',
     ingredients: imported.ingredients,
