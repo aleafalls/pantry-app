@@ -203,7 +203,16 @@ export default function DrawerSelect({
         </DrawerHeader>
 
         {/* Pills */}
-        <div className="no-scrollbar flex-1 min-h-0 overflow-y-auto px-5 py-2">
+        <div
+          className="no-scrollbar flex-1 min-h-0 overflow-y-auto px-5"
+          style={{
+            paddingTop: 8,
+            // When there's no footer below (no search/add-new), this is the
+            // last thing before the drawer edge — needs its own safe-area
+            // clearance instead of relying on a footer's padding.
+            paddingBottom: (onAddNew || searchable) ? 8 : 'calc(20px + env(safe-area-inset-bottom))',
+          }}
+        >
           {filteredGroups ? (
             filteredGroups.map(group => (
               <div key={group.label} className="mb-5">
@@ -220,7 +229,7 @@ export default function DrawerSelect({
 
         {/* Bottom area: add new + search */}
         {(onAddNew || searchable) && (
-          <div className="shrink-0 px-5 pt-2 pb-7 flex flex-col gap-3" style={{ borderTop: '1px solid var(--divider)' }}>
+          <div className="shrink-0 px-5 pt-2 flex flex-col gap-3" style={{ borderTop: '1px solid var(--divider)', paddingBottom: 'calc(28px + env(safe-area-inset-bottom))' }}>
 
             {/* Inline add new */}
             {onAddNew && (
