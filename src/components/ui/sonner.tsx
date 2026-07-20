@@ -9,8 +9,18 @@ import {
 } from "lucide-react"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 
-// Sits 16px above BottomNav (bottom: 16 + ~59px nav height).
-const NAV_CLEARANCE = 91
+// Top-anchored, not bottom — this app's bottom edge is where BottomNav,
+// bottom sheets (servings drawer, remove-member confirm, etc.), and forms'
+// primary action buttons all live. A bottom-center toast can render above
+// those (sonner's z-index beats a Sheet's), visually covering the exact
+// button the toast is telling you about. 160px clears the tallest
+// PageHeader in the app (title row + two children rows, e.g. Tonight's
+// tabs + shopping toggle) — confirmed by testing that a shorter offset
+// still overlapped a recipe page's Cook/Plan/Edit tab row and intercepted
+// taps meant for it. Simple single-row headers just get a bit more
+// breathing room below the toast, which is a cosmetic tradeoff, not a
+// blocked tap.
+const TOP_CLEARANCE = 160
 
 const glassToast: React.CSSProperties = {
   backdropFilter: 'blur(14px) saturate(180%)',
@@ -30,9 +40,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme="light"
-      position="bottom-center"
-      offset={{ bottom: NAV_CLEARANCE }}
-      mobileOffset={{ bottom: NAV_CLEARANCE }}
+      position="top-center"
+      duration={3500}
+      offset={{ top: TOP_CLEARANCE }}
+      mobileOffset={{ top: TOP_CLEARANCE }}
       style={{
         left: COLUMN_INSET,
         right: COLUMN_INSET,

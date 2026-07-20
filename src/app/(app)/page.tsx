@@ -113,7 +113,7 @@ export default async function DashboardPage() {
     }))
     .filter(recipe => recipe.matchPercent >= 70)
     .sort((a, b) => b.matchPercent - a.matchPercent)
-    .slice(0, 5)
+    .slice(0, 6)
 
   const isEmpty = itemCount === 0
 

@@ -108,7 +108,6 @@ export default function AddPage() {
       location: item.default_location,
     })
     if (item.emoji) params.set('emoji', item.emoji)
-    if (item.tags?.length) params.set('tags', item.tags.join(','))
     router.push(`/add/new?${params.toString()}`)
   }
 

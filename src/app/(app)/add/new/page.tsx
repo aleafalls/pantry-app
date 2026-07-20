@@ -51,10 +51,7 @@ function NewItemForm() {
   const [preferredStores, setPreferredStores] = useState<string[]>([])
   const [householdStores, setHouseholdStores] = useState<string[]>([])
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
-  const [tags, setTags] = useState<string[]>(() => {
-    const raw = searchParams.get('tags')
-    return raw ? raw.split(',').filter(Boolean) : []
-  })
+  const [tags, setTags] = useState<string[]>([])
   const [estimatedPrice, setEstimatedPrice] = useState<number | null>(null)
   const [canonicalName, setCanonicalName] = useState<string | null>(null)
 

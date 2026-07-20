@@ -177,10 +177,12 @@ export default function InventoryPage() {
 
   // Group by primary location when no location filter is active
   const grouped = locationFilters.length === 0
-    ? LOCATIONS.map(loc => ({
-        loc,
-        items: filtered.filter(i => i.primaryLocation === loc.value),
-      })).filter(g => g.items.length > 0)
+    ? [...LOCATIONS]
+        .sort((a, b) => a.label.localeCompare(b.label))
+        .map(loc => ({
+          loc,
+          items: filtered.filter(i => i.primaryLocation === loc.value),
+        })).filter(g => g.items.length > 0)
     : null
 
   return (
@@ -310,7 +312,6 @@ export default function InventoryPage() {
                           location: item.default_location,
                         })
                         if (item.emoji) params.set('emoji', item.emoji)
-                        if (item.tags?.length) params.set('tags', item.tags.join(','))
                         router.push(`/add/new?${params.toString()}`)
                       }}
                       style={{

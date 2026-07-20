@@ -85,7 +85,7 @@ export default function RecipeCard({ id, name, emoji, imageUrl, source, matchPer
         <span
           className="text-13 font-bold"
           style={{
-            color: 'var(--foreground)', lineHeight: 1.3,
+            color: 'var(--foreground)', lineHeight: 1.3, height: '33.8px',
             display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
           }}

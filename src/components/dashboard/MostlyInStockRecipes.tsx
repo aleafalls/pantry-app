@@ -10,11 +10,9 @@ export default function MostlyInStockRecipes({ recipes }: Props) {
         style={{ color: 'var(--foreground)' }}>
         Mostly in Stock Saved Recipes
       </span>
-      <div className="no-scrollbar flex gap-2 overflow-x-auto -mx-5 px-5 pb-1">
+      <div className="grid grid-cols-2 gap-2">
         {recipes.map(recipe => (
-          <div key={recipe.id} className="shrink-0" style={{ width: 140 }}>
-            <RecipeCard {...recipe} />
-          </div>
+          <RecipeCard key={recipe.id} {...recipe} />
         ))}
       </div>
     </div>

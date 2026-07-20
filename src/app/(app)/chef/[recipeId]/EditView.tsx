@@ -32,7 +32,7 @@ interface Props {
   recipe: RecipeData
   ingredients: RecipeIngredientData[]
   householdId: string
-  onSaved: () => void
+  onSaved: (newServings: number) => void
 }
 
 export default function EditView({ recipe, ingredients: initialIngredients, householdId, onSaved }: Props) {
@@ -78,6 +78,10 @@ export default function EditView({ recipe, ingredients: initialIngredients, hous
         course_type: courseType || null,
         tags,
         servings,
+        // A manual edit can rewrite servings and every ingredient quantity
+        // together, so any "always make N of this" override from the Cook/
+        // Plan servings drawer no longer applies against the new baseline.
+        preferred_servings: null,
         total_time_minutes: totalTimeMinutes || null,
         instructions: instructions.trim() || null,
         image_url: imageUrl,
@@ -112,7 +116,11 @@ export default function EditView({ recipe, ingredients: initialIngredients, hous
     try {
       await savePromise
       router.refresh()
-      onSaved()
+      // Pass the just-saved servings value directly rather than relying on
+      // the router.refresh() re-fetch to land before this renders — in
+      // testing that refresh didn't reliably deliver fresh props in time,
+      // leaving the Cook/Plan badge showing the pre-edit servings count.
+      onSaved(servings)
     } catch {
       // already surfaced via toast.promise's error handler
     } finally {

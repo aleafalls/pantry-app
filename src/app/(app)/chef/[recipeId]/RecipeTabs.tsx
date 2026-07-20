@@ -1,13 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import PageHeader from '@/components/layout/PageHeader'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { useSwipeableTabs } from '@/hooks/useSwipeableTabs'
 import type { InventoryItem } from '@/lib/chefData'
+import { agreeUnit, scaleQuantity } from '@/lib/quantity'
 import CookView from './CookView'
 import PlanView from './PlanView'
 import EditView from './EditView'
+import ServingsDrawer from './ServingsDrawer'
 
 export interface RecipeIngredientData {
   id: string
@@ -26,6 +28,7 @@ export interface RecipeData {
   course_type: string | null
   tags: string[] | null
   servings: number | null
+  preferred_servings: number | null
   total_time_minutes: number | null
   instructions: string | null
   source_url: string | null
@@ -50,6 +53,32 @@ export default function RecipeTabs({ recipe, ingredients, inventory, householdId
   const [tab, setTab] = useState('cook')
   const activeIndex = TABS.findIndex(t => t.value === tab)
   const bind = useSwipeableTabs(activeIndex, TABS.length, index => setTab(TABS[index].value))
+
+  const [servings, setServings] = useState(recipe.preferred_servings ?? recipe.servings ?? 2)
+  const [servingsDrawerOpen, setServingsDrawerOpen] = useState(false)
+
+  // Re-sync after the recipe's own stored servings/override actually
+  // change — e.g. an Edit-tab save clears preferred_servings server-side
+  // and router.refresh()es this page, but a plain useState initializer
+  // only runs on first mount, so without this the badge would keep
+  // showing the pre-edit value until a manual reload.
+  useEffect(() => {
+    setServings(recipe.preferred_servings ?? recipe.servings ?? 2)
+  }, [recipe.servings, recipe.preferred_servings])
+
+  // recipe.servings is the fixed baseline the ingredient quantities were
+  // written for — it's what scaling divides by, not the adjustable value.
+  // When it's missing (older recipes without a servings count), there's no
+  // reliable base to scale from, so ingredients render unscaled.
+  const baseServings = recipe.servings
+  const scaleFactor = baseServings && baseServings > 0 ? servings / baseServings : 1
+  const scaledIngredients = useMemo(
+    () => ingredients.map(ing => {
+      const quantity = scaleQuantity(ing.quantity, scaleFactor)
+      return { ...ing, quantity, unit: agreeUnit(ing.unit, quantity) }
+    }),
+    [ingredients, scaleFactor]
+  )
 
   return (
     <>
@@ -85,13 +114,22 @@ export default function RecipeTabs({ recipe, ingredients, inventory, householdId
       </PageHeader>
 
       <div {...bind()} style={{ padding: '20px 20px 0' }}>
-        {tab === 'cook' && <CookView recipe={recipe} ingredients={ingredients} />}
+        {tab === 'cook' && (
+          <CookView
+            recipe={recipe}
+            ingredients={scaledIngredients}
+            servings={servings}
+            onOpenServingsDrawer={() => setServingsDrawerOpen(true)}
+          />
+        )}
         {tab === 'plan' && (
           <PlanView
-            ingredients={ingredients}
+            ingredients={scaledIngredients}
             inventory={inventory}
             householdId={householdId}
             userId={userId}
+            servings={servings}
+            onOpenServingsDrawer={() => setServingsDrawerOpen(true)}
           />
         )}
         {tab === 'edit' && (
@@ -99,10 +137,19 @@ export default function RecipeTabs({ recipe, ingredients, inventory, householdId
             recipe={recipe}
             ingredients={ingredients}
             householdId={householdId}
-            onSaved={() => setTab('cook')}
+            onSaved={(newServings) => { setServings(newServings); setTab('cook') }}
           />
         )}
       </div>
+
+      <ServingsDrawer
+        open={servingsDrawerOpen}
+        onOpenChange={setServingsDrawerOpen}
+        servings={servings}
+        onServingsChange={setServings}
+        recipeId={recipe.id}
+        householdId={householdId}
+      />
     </>
   )
 }

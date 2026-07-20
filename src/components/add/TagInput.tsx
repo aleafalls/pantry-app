@@ -50,7 +50,7 @@ export default function TagInput({ tags, onChange, suggestions = [] }: Props) {
       setHighlighted(prev => (prev + dir + matches.length) % matches.length)
       return
     }
-    if (e.key === ' ' || e.key === ',' || e.key === 'Enter') {
+    if (e.key === ',' || e.key === 'Enter') {
       e.preventDefault()
       if (showDropdown) {
         addTag(matches[highlighted])
@@ -96,7 +96,7 @@ export default function TagInput({ tags, onChange, suggestions = [] }: Props) {
       <div style={{ position: 'relative' }}>
         <Input
           type="text"
-          placeholder="Type a tag, then press space or comma"
+          placeholder="Type a tag, then press comma or enter"
           value={input}
           onChange={e => { setInput(e.target.value); setHighlighted(0) }}
           onKeyDown={handleKeyDown}
