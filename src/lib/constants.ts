@@ -37,7 +37,7 @@ export const LOCATIONS = [
   { value: 'fridge',            label: 'Fridge',            emoji: '🧊' },
   { value: 'freezer',           label: 'Freezer',           emoji: '❄️' },
   { value: 'spice_rack',        label: 'Spice Rack',        emoji: '🧂' },
-  { value: 'cleaning_supplies', label: 'Cleaning Supplies', emoji: '🧽' },
+  { value: 'cleaning_supplies', label: 'Household Supplies', emoji: '🧽' },
   { value: 'garage_overflow',   label: 'Garage / Overflow', emoji: '🧰' },
 ]
 
