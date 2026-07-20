@@ -1,10 +1,19 @@
 'use client'
 
 import { Suspense, useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import OtpCodeInput, { OTP_LENGTH } from '@/components/auth/OtpCodeInput'
+
+// Maps known verifyOtp failures to friendlier copy; anything unrecognized
+// passes through Supabase's raw message rather than being hidden.
+function mapOtpError(message: string): string {
+  if (/expired|invalid/i.test(message)) return "That code didn't work — check the digits or resend."
+  if (/rate limit|too many/i.test(message)) return 'Too many attempts — wait a moment and try again.'
+  return message
+}
 
 // Glass card style matching the dashboard stat cards
 const GLASS_CARD: React.CSSProperties = {
@@ -41,21 +50,35 @@ const FLOATING_CARDS: {
 ]
 
 function AuthForm() {
+  const router = useRouter()
   const searchParams = useSearchParams()
+  const [step, setStep] = useState<'email' | 'code'>('email')
   const [email, setEmail] = useState('')
-  const [sent, setSent] = useState(false)
+  const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
+  const [verifying, setVerifying] = useState(false)
   const [error, setError] = useState('')
+  const [resendCooldown, setResendCooldown] = useState(0)
 
   // Surface a failed magic-link exchange (see src/app/auth/callback/route.ts)
-  // instead of silently landing back on a blank sign-in form.
+  // — kept as a fallback path for anyone who taps the link instead of
+  // entering the code, e.g. on a device where the installed home-screen
+  // app and the regular browser are separate storage contexts and the
+  // code is the only path that works reliably there.
   useEffect(() => {
     const callbackError = searchParams.get('error')
     // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: surface a failed magic-link exchange from the callback redirect
     if (callbackError) setError(callbackError)
   }, [searchParams])
 
-  async function handleSubmit(e: React.FormEvent) {
+  // Resend cooldown countdown — ticks down to 0, then "Resend code" re-enables.
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const timer = setInterval(() => setResendCooldown(s => Math.max(0, s - 1)), 1000)
+    return () => clearInterval(timer)
+  }, [resendCooldown])
+
+  async function requestCode(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
@@ -65,8 +88,19 @@ function AuthForm() {
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     })
     if (error) { setError(error.message); setLoading(false); return }
-    setSent(true)
+    setStep('code')
+    setResendCooldown(30)
     setLoading(false)
+  }
+
+  async function verifyCode() {
+    setVerifying(true)
+    setError('')
+    const supabase = createClient()
+    const { error } = await supabase.auth.verifyOtp({ email, token: code.trim(), type: 'email' })
+    if (error) { setError(mapOtpError(error.message)); setCode(''); setVerifying(false); return }
+    router.push('/')
+    router.refresh()
   }
 
   return (
@@ -186,31 +220,59 @@ function AuthForm() {
         border: '1px solid oklch(100% 0 0 / 0.6)',
         boxShadow: 'oklch(1 0 0 / 0.7) 0px 0px 0px inset, oklch(0.3 0.02 85 / 0.25) 0px 8px 32px -8px',
       }}>
-        {sent ? (
-          <div style={{ textAlign: 'center', padding: '8px 0' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>📬</div>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--foreground)', marginBottom: 6 }}>
-              Check your email
-            </h2>
-            <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.5 }}>
-              We sent a sign-in link to <strong>{email}</strong>. Tap it to continue.
-            </p>
-            <p style={{ fontSize: 12, color: 'var(--muted-light)', marginTop: 8 }}>
-              Didn&apos;t get it? Check your spam or{' '}
+        {step === 'code' ? (
+          <form onSubmit={e => { e.preventDefault(); verifyCode() }} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--foreground)', margin: '0 0 6px' }}>
+                Enter your code
+              </h2>
+              <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.5, margin: 0 }}>
+                We sent a {OTP_LENGTH}-digit code to <strong>{email}</strong>.
+              </p>
+            </div>
+            <OtpCodeInput value={code} onChange={setCode} onComplete={verifyCode} disabled={verifying} autoFocus />
+            {error && (
+              <p style={{ fontSize: 13, color: 'var(--red)', margin: 0 }}>{error}</p>
+            )}
+            <Button
+              type="submit"
+              variant="brand"
+              disabled={verifying || code.trim().length < OTP_LENGTH}
+              style={{
+                background: 'linear-gradient(150deg, var(--yellow-light), var(--yellow))',
+                color: '#4A3300',
+                padding: '14px 16px',
+                fontSize: 15,
+                fontWeight: 700,
+              }}
+            >
+              {verifying ? 'Verifying…' : 'Verify & sign in'}
+            </Button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <button
-                onClick={() => setSent(false)}
+                type="button"
+                onClick={() => { setStep('email'); setCode(''); setError('') }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--muted)', fontFamily: 'inherit', padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}
+              >
+                <i className="fi-rr-angle-left" style={{ fontSize: 12, display: 'block', lineHeight: 1 }} />
+                Use a different email
+              </button>
+              <button
+                type="button"
+                onClick={e => requestCode(e as unknown as React.FormEvent)}
+                disabled={loading || resendCooldown > 0}
                 style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: 12, color: 'var(--amber)', fontWeight: 700,
-                  fontFamily: 'inherit', padding: 0,
+                  background: 'none', border: 'none', fontSize: 13, fontWeight: 700, fontFamily: 'inherit', padding: 0,
+                  color: resendCooldown > 0 ? 'var(--muted)' : 'var(--amber)',
+                  cursor: loading || resendCooldown > 0 ? 'default' : 'pointer',
                 }}
               >
-                try again
+                {loading ? 'Sending…' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
               </button>
-            </p>
-          </div>
+            </div>
+          </form>
         ) : (
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <form onSubmit={requestCode} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--foreground)', margin: 0 }}>
               Enter your email to get started or log in
             </p>
@@ -239,7 +301,7 @@ function AuthForm() {
                 fontWeight: 700,
               }}
             >
-              {loading ? 'Sending…' : 'Send magic link'}
+              {loading ? 'Sending…' : 'Send code'}
             </Button>
           </form>
         )}

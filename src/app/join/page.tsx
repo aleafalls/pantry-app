@@ -7,6 +7,15 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import OnboardingTour from '@/components/onboarding/OnboardingTour'
+import OtpCodeInput, { OTP_LENGTH } from '@/components/auth/OtpCodeInput'
+
+// Maps known verifyOtp failures to friendlier copy; anything unrecognized
+// passes through Supabase's raw message rather than being hidden.
+function mapOtpError(message: string): string {
+  if (/expired|invalid/i.test(message)) return "That code didn't work — check the digits or resend."
+  if (/rate limit|too many/i.test(message)) return 'Too many attempts — wait a moment and try again.'
+  return message
+}
 
 // Same floating cards as onboarding but reordered/reused
 const FLOATING_CARDS: {
@@ -67,6 +76,18 @@ function JoinForm() {
   const [household, setHousehold] = useState<Household | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  // OTP sign-in code — distinct from `code` above, which is the invite code
+  // (e.g. "PINE-42") used to look up the household.
+  const [otpCode, setOtpCode] = useState('')
+  const [verifyingOtp, setVerifyingOtp] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
+
+  // Resend cooldown countdown — ticks down to 0, then "Resend code" re-enables.
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const timer = setInterval(() => setResendCooldown(s => Math.max(0, s - 1)), 1000)
+    return () => clearInterval(timer)
+  }, [resendCooldown])
 
   // On load: if we arrived with a code (either from the invite link, or
   // bounced back here from the magic-link email via /auth/callback), resolve
@@ -177,7 +198,36 @@ function JoinForm() {
     })
     if (error) { setError(error.message); setLoading(false); return }
     setLoading(false)
+    setResendCooldown(30)
     setStep('checkEmail')
+  }
+
+  async function verifyOtpCode() {
+    setVerifyingOtp(true)
+    setError('')
+    const supabase = createClient()
+    const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: otpCode.trim(), type: 'email' })
+    if (error) { setError(mapOtpError(error.message)); setOtpCode(''); setVerifyingOtp(false); return }
+
+    // Same post-auth branch as handleCodeSubmit above: link the household
+    // (already resolved in state — no need to re-look-up by invite code)
+    // if the profile already has a name, otherwise collect one.
+    if (!household) { router.push('/'); router.refresh(); return }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setVerifyingOtp(false); return }
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', user.id)
+      .single()
+    if (profile?.display_name) {
+      await supabase.from('profiles').update({ household_id: household.id }).eq('id', user.id)
+      router.push('/')
+      router.refresh()
+      return
+    }
+    setStep('name')
+    setVerifyingOtp(false)
   }
 
   async function handleJoin(e: React.FormEvent) {
@@ -313,7 +363,7 @@ function JoinForm() {
               {error && <p style={{ fontSize: 13, color: 'var(--red)', margin: 0 }}>{error}</p>}
               <Button type="submit" variant="brand" disabled={loading || !email.trim()}
                 style={{ background: 'linear-gradient(150deg, var(--yellow-light), var(--yellow))', color: '#4A3300', padding: '14px 16px', fontWeight: 700 }}>
-                {loading ? 'Sending…' : 'Send magic link'}
+                {loading ? 'Sending…' : 'Send code'}
               </Button>
               <button type="button" onClick={() => setStep('code')}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--muted)', fontFamily: 'inherit', padding: 0, display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'center' }}>
@@ -323,24 +373,46 @@ function JoinForm() {
             </form>
           </>
         ) : step === 'checkEmail' ? (
-          <div style={{ textAlign: 'center', padding: '8px 0' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>📬</div>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--foreground)', marginBottom: 6 }}>
-              Check your email
-            </h2>
-            <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.5 }}>
-              We sent a sign-in link to <strong>{email}</strong>. Tap it to finish joining {household?.name} — no need to re-enter anything.
-            </p>
-            <p style={{ fontSize: 12, color: 'var(--muted-light)', marginTop: 8 }}>
-              Didn&apos;t get it? Check your spam or{' '}
+          <form onSubmit={e => { e.preventDefault(); verifyOtpCode() }} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ marginBottom: 8 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--foreground)', marginBottom: 6 }}>
+                Enter your code
+              </h2>
+              <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.5, margin: 0 }}>
+                We sent a {OTP_LENGTH}-digit code to <strong>{email}</strong> to finish joining {household?.name}.
+              </p>
+            </div>
+            <OtpCodeInput value={otpCode} onChange={setOtpCode} onComplete={verifyOtpCode} disabled={verifyingOtp} autoFocus />
+            {error && (
+              <p style={{ fontSize: 13, color: 'var(--red)', margin: 0 }}>{error}</p>
+            )}
+            <Button type="submit" variant="brand" disabled={verifyingOtp || otpCode.trim().length < OTP_LENGTH}
+              style={{ background: 'linear-gradient(150deg, var(--yellow-light), var(--yellow))', color: '#4A3300', padding: '14px 16px', fontWeight: 700 }}>
+              {verifyingOtp ? 'Verifying…' : 'Verify & join'}
+            </Button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <button
-                onClick={() => setStep('sendEmail')}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: 'var(--amber)', fontWeight: 700, fontFamily: 'inherit', padding: 0 }}
+                type="button"
+                onClick={() => { setStep('sendEmail'); setOtpCode(''); setError('') }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--muted)', fontFamily: 'inherit', padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}
               >
-                try again
+                <i className="fi-rr-angle-left" style={{ fontSize: 12, display: 'block', lineHeight: 1 }} />
+                Use a different email
               </button>
-            </p>
-          </div>
+              <button
+                type="button"
+                onClick={e => handleSendEmail(e as unknown as React.FormEvent)}
+                disabled={loading || resendCooldown > 0}
+                style={{
+                  background: 'none', border: 'none', fontSize: 13, fontWeight: 700, fontFamily: 'inherit', padding: 0,
+                  color: resendCooldown > 0 ? 'var(--muted)' : 'var(--amber)',
+                  cursor: loading || resendCooldown > 0 ? 'default' : 'pointer',
+                }}
+              >
+                {loading ? 'Sending…' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+              </button>
+            </div>
+          </form>
         ) : (
           <>
             <div style={{ marginBottom: 20 }}>
