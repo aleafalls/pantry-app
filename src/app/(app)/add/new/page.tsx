@@ -37,8 +37,10 @@ function NewItemForm() {
   // ── Stock ─────────────────────────────────────────────────
   // Arriving from a shopping-list entry means this is being catalogued,
   // not confirmed as purchased yet — default to 0 on hand rather than
-  // silently claiming you already have one. Checking it off on the
-  // shopping list later is what actually adds real stock.
+  // silently claiming you already have one. Any entry point can still be
+  // saved at 0 (tracking something you don't have yet), which combined
+  // with the default "auto add to shopping list" below puts it straight
+  // on the list.
   const [quantity, setQuantity] = useState(shoppingListId ? 0 : 1)
   const [unit, setUnit] = useState(searchParams.get('unit') ?? 'each')
   const [location, setLocation] = useState(searchParams.get('location') ?? 'pantry')
@@ -152,7 +154,7 @@ function NewItemForm() {
     setPreferredStores(prev => [...prev, storeName])
   }
 
-  const isValid = name.trim() && category && location && unit && (shoppingListId ? quantity >= 0 : quantity > 0)
+  const isValid = name.trim() && category && location && unit && quantity >= 0
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -311,7 +313,7 @@ function NewItemForm() {
         {detailRow(
           'quantity',
           <Label>Quantity</Label>,
-          <QuantityStepper value={quantity} onChange={setQuantity} min={shoppingListId ? 0 : 1} />
+          <QuantityStepper value={quantity} onChange={setQuantity} min={0} />
         )}
 
         {detailRow(
