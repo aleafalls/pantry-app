@@ -221,3 +221,4 @@ src/app/
 - Build plan: `pantry-app-build-plan.md`
 - Catalog seed: `supabase/seed-catalog.sql`
 - Design source: Claude Design `b172af86-6596-44ba-8836-6fd416cb0b98`
+- Deployment process, environments, and troubleshooting: `.claude/docs/deployment.md` — read this before touching Vercel/GitHub deploy config or diagnosing a "why didn't this deploy" issue.

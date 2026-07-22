@@ -9,6 +9,7 @@ import Link from 'next/link'
 import AppBackground from '@/components/layout/AppBackground'
 import BarcodeScanner from '@/components/add/BarcodeScanner'
 import { prewarmEnrichment } from '@/lib/enrichment'
+import { fetchReceiptPhotoImport, setReceiptImportDraft } from '@/lib/receiptImport'
 
 interface HouseholdItem {
   id: string
@@ -41,6 +42,10 @@ export default function AddPage() {
   const [shoppingTier, setShoppingTier] = useState<number | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [scanLookupLoading, setScanLookupLoading] = useState(false)
+  const [receiptLoading, setReceiptLoading] = useState(false)
+  const [receiptError, setReceiptError] = useState<string | null>(null)
+  const receiptInputRef = useRef<HTMLInputElement>(null)
+  const submittingReceiptRef = useRef(false)
 
   // Load household id + location/shopping-tier (for enrichment context) on mount, + auto-focus
   useEffect(() => {
@@ -151,6 +156,26 @@ export default function AddPage() {
     }
   }
 
+  async function handleReceiptChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow re-selecting the same file after an error
+    if (!file || submittingReceiptRef.current) return
+    submittingReceiptRef.current = true
+    setReceiptLoading(true)
+    setReceiptError(null)
+
+    const result = await fetchReceiptPhotoImport(file)
+    submittingReceiptRef.current = false
+    setReceiptLoading(false)
+
+    if (result.error || !result.data) {
+      setReceiptError(result.error ?? "Couldn't read that receipt.")
+      return
+    }
+    setReceiptImportDraft(result.data)
+    router.push('/add/receipt')
+  }
+
   const hasResults = householdItems.length > 0 || catalogItems.length > 0
   const showCreate = query.trim().length > 0
 
@@ -182,7 +207,7 @@ export default function AddPage() {
                 background: 'oklch(100% 0 0 / 0.7)',
                 borderColor: 'oklch(100% 0 0 / 0.5)',
                 color: 'var(--foreground)',
-                padding: query ? '10px 68px 10px 14px' : '10px 40px 10px 14px',
+                padding: query ? '10px 40px 10px 14px' : '10px 14px',
               }}
             />
             {query && (
@@ -190,7 +215,7 @@ export default function AddPage() {
                 type="button"
                 onClick={() => setQuery('')}
                 style={{
-                  position: 'absolute', right: 38, top: '50%', transform: 'translateY(-50%)',
+                  position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
                   background: 'none', border: 'none', cursor: 'pointer', padding: 0,
                   display: 'flex', alignItems: 'center',
                 }}
@@ -199,21 +224,17 @@ export default function AddPage() {
                 <i className="fi-rr-cross-small" style={{ display: 'block', fontSize: 18, lineHeight: 1, color: 'var(--muted)' }} />
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setScannerOpen(true)}
-              style={{
-                position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                fontSize: 18, background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                color: 'var(--muted)',
-              }}
-              aria-label="Scan barcode"
-            >
-              <i className="fi-rr-barcode-scan" style={{ display: 'block', fontSize: 18, color: 'var(--muted)' }} />
-            </button>
           </div>
         </div>
       </div>
+
+      <input
+        ref={receiptInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleReceiptChange}
+        style={{ display: 'none' }}
+      />
 
       <BarcodeScanner
         open={scannerOpen}
@@ -236,6 +257,49 @@ export default function AddPage() {
             <p className="text-sm" style={{ color: 'var(--muted)' }}>
               Search for an item to add or restock it in your pantry.
             </p>
+
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 24 }}>
+              <button
+                type="button"
+                onClick={() => receiptInputRef.current?.click()}
+                disabled={receiptLoading}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  gap: 8, padding: '20px 24px', flex: 1, maxWidth: 160,
+                  background: 'oklch(100% 0 0 / 0.4)',
+                  border: '1.5px dashed oklch(60% 0.02 85 / 0.4)',
+                  borderRadius: 16, cursor: receiptLoading ? 'default' : 'pointer',
+                }}
+              >
+                <i
+                  className={receiptLoading ? 'fi-rr-rotate-right' : 'fi-rr-receipt'}
+                  style={{ fontSize: 22, display: 'block', color: 'var(--amber)', animation: receiptLoading ? 'spin 1s linear infinite' : 'none' }}
+                />
+                <span className="text-13 font-semibold" style={{ color: 'var(--foreground)' }}>
+                  {receiptLoading ? 'Reading…' : 'Import'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setScannerOpen(true)}
+                disabled={receiptLoading}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  gap: 8, padding: '20px 24px', flex: 1, maxWidth: 160,
+                  background: 'oklch(100% 0 0 / 0.4)',
+                  border: '1.5px dashed oklch(60% 0.02 85 / 0.4)',
+                  borderRadius: 16, cursor: receiptLoading ? 'default' : 'pointer',
+                }}
+              >
+                <i className="fi-rr-barcode-scan" style={{ fontSize: 22, display: 'block', color: 'var(--amber)' }} />
+                <span className="text-13 font-semibold" style={{ color: 'var(--foreground)' }}>Barcode</span>
+              </button>
+            </div>
+
+            {receiptError && (
+              <p className="text-sm" style={{ color: 'var(--red)', marginTop: 12 }}>{receiptError}</p>
+            )}
           </div>
         )}
 
