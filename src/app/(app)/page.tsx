@@ -4,6 +4,7 @@ import DashboardHeader from '@/components/dashboard/DashboardHeader'
 import StatCards from '@/components/dashboard/StatCards'
 import RecipeTeaser from '@/components/dashboard/RecipeTeaser'
 import AddFirstItemCard from '@/components/dashboard/AddFirstItemCard'
+import QuickSetupCard from '@/components/dashboard/QuickSetupCard'
 import RunningLow from '@/components/dashboard/RunningLow'
 import UseTheseUp from '@/components/dashboard/UseTheseUp'
 import MostlyInStockRecipes from '@/components/dashboard/MostlyInStockRecipes'
@@ -49,7 +50,7 @@ export default async function DashboardPage() {
 
   const household = profile.households as unknown as { id: string; name: string }
 
-  const [{ data: members }, { data: inventory }, chefContext, { data: savedRecipes }] = await Promise.all([
+  const [{ data: members }, { data: inventory }, chefContext, { data: savedRecipes }, { data: householdPrefs }] = await Promise.all([
     supabase
       .from('profiles')
       .select('display_name, avatar_emoji')
@@ -67,11 +68,31 @@ export default async function DashboardPage() {
       .from('recipes')
       .select('id, name, emoji, image_url, source')
       .eq('household_id', profile.household_id),
+    supabase
+      .from('household_preferences')
+      .select('dismissed_quick_setup')
+      .eq('household_id', profile.household_id)
+      .maybeSingle(),
   ])
 
   const allInventory = (inventory ?? []) as unknown as DashboardInventoryRow[]
   const itemCount = new Set(allInventory.map(i => i.items.id)).size
   const estValue = allInventory.reduce((sum, inv) => sum + inv.quantity * (inv.items.estimated_price ?? 0), 0)
+
+  // Quick Setup card: visible while the household is still light on items
+  // and hasn't dismissed it. Once itemCount crosses the 10-item threshold,
+  // permanently persist the dismissal so the card doesn't reappear if items
+  // are later removed and the count dips back below 10.
+  let dismissedQuickSetup = householdPrefs?.dismissed_quick_setup ?? false
+  if (!dismissedQuickSetup && itemCount >= 10) {
+    dismissedQuickSetup = true
+    await supabase.from('household_preferences').upsert({
+      household_id: profile.household_id,
+      dismissed_quick_setup: true,
+      updated_at: new Date().toISOString(),
+    })
+  }
+  const showQuickSetup = itemCount < 10 && !dismissedQuickSetup
 
   const allLowItems = aggregateInventoryByItem(allInventory)
     .filter(isRunningLow)
@@ -156,7 +177,9 @@ export default async function DashboardPage() {
         <DashboardRefresh>
           <div className="flex flex-col gap-4 px-5 pt-14px pb-4">
             <StatCards itemCount={itemCount} lowCount={allLowItems.length} estValue={estValue} />
-            {isEmpty ? <AddFirstItemCard /> : <RecipeTeaser />}
+            {isEmpty && <AddFirstItemCard />}
+            {showQuickSetup && <QuickSetupCard />}
+            {!isEmpty && !showQuickSetup && <RecipeTeaser />}
             <RunningLow items={lowItems} totalLowCount={allLowItems.length} />
             {oldestItems.length > 0 && <UseTheseUp items={oldestItems} />}
             <MostlyInStockRecipes recipes={mostlyInStockRecipes} />
